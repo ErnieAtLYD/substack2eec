@@ -91,12 +91,16 @@ that together form the best EEC. The lessons array must be ordered by sequencePo
 
   const response = await getClient().messages.create({
     model: MODEL,
-    max_tokens: 1024,
+    max_tokens: 4096,
     system: CURATION_SYSTEM,
     tools: [CURATION_TOOL],
     tool_choice: { type: 'tool', name: 'select_course_posts' },
     messages: [{ role: 'user', content: prompt }],
   })
+
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error('Curation response was truncated (max_tokens). Try with fewer posts.')
+  }
 
   const toolBlock = response.content.find(b => b.type === 'tool_use')
   if (!toolBlock || toolBlock.type !== 'tool_use') {
