@@ -1,9 +1,13 @@
 import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
-import { env } from '@/env'
+import { getEnv } from '@/env'
 import type { SubstackPost, CuratedSelection, GeneratedLesson, CuratedLesson } from '@/types'
 
-const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
+let _client: Anthropic | null = null
+function getClient(): Anthropic {
+  if (!_client) _client = new Anthropic({ apiKey: getEnv().ANTHROPIC_API_KEY })
+  return _client
+}
 
 const MODEL = 'claude-sonnet-4-6'
 
@@ -85,7 +89,7 @@ Select exactly 5 posts (or fewer if the archive has fewer than 5 suitable posts)
 that together form the best EEC. The lessons array must be ordered by sequencePosition \
 (1 = first email sent).`
 
-  const response = await client.messages.create({
+  const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 1024,
     system: CURATION_SYSTEM,
@@ -220,7 +224,7 @@ ${post.bodyText}
 
 Write Lesson ${lessonNum} of ${total} now. Start directly with "## Lesson ${lessonNum}:".`
 
-  const stream = client.messages.stream({
+  const stream = getClient().messages.stream({
     model: MODEL,
     max_tokens: 2048,
     system: buildRewriteSystem(),

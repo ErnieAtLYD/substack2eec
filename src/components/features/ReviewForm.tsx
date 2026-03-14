@@ -6,6 +6,33 @@ import type { SubstackPost, GeneratedLesson, CurateSSEEvent } from '@/types'
 type Step = 'input' | 'fetching' | 'generating' | 'review' | 'downloading'
 
 const SESSION_KEY = 'eec_lessons'
+const SESSION_META_KEY = 'eec_meta'
+
+interface CourseMeta {
+  courseTitle: string
+  courseDescription: string
+}
+
+function readSessionMeta(): CourseMeta | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_META_KEY)
+    return raw ? (JSON.parse(raw) as CourseMeta) : null
+  } catch {
+    return null
+  }
+}
+
+function writeSessionMeta(meta: CourseMeta) {
+  try {
+    sessionStorage.setItem(SESSION_META_KEY, JSON.stringify(meta))
+  } catch {}
+}
+
+function clearSessionMeta() {
+  try {
+    sessionStorage.removeItem(SESSION_META_KEY)
+  } catch {}
+}
 
 function readSessionLessons(): GeneratedLesson[] | null {
   try {
@@ -34,6 +61,7 @@ export default function ReviewForm() {
   const [step, setStep] = useState<Step>('input')
   const [url, setUrl] = useState('')
   const [lessons, setLessons] = useState<GeneratedLesson[]>([])
+  const [courseMeta, setCourseMeta] = useState<CourseMeta>({ courseTitle: '', courseDescription: '' })
   const [streamLog, setStreamLog] = useState<string[]>([])
   const [slowWarning, setSlowWarning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,8 +72,10 @@ export default function ReviewForm() {
   // On mount: restore from sessionStorage if available
   useEffect(() => {
     const saved = readSessionLessons()
+    const meta = readSessionMeta()
     if (saved && saved.length > 0) {
       setLessons(saved)
+      if (meta) setCourseMeta(meta)
       setStep('review')
     }
   }, [])
@@ -137,6 +167,9 @@ export default function ReviewForm() {
           }
 
           if (event.type === 'selection') {
+            const meta = { courseTitle: event.data.courseTitle, courseDescription: event.data.courseDescription }
+            setCourseMeta(meta)
+            writeSessionMeta(meta)
             setStreamLog(prev => [...prev, `Course: "${event.data.courseTitle}"`])
           } else if (event.type === 'lesson_start') {
             setStreamLog(prev => [...prev, `Writing lesson ${event.lessonNumber}…`])
@@ -185,7 +218,7 @@ export default function ReviewForm() {
       const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lessons }),
+        body: JSON.stringify({ lessons, courseTitle: courseMeta.courseTitle, courseDescription: courseMeta.courseDescription }),
       })
       if (!res.ok) {
         setError('Failed to generate ZIP. Please try again.')
@@ -206,7 +239,9 @@ export default function ReviewForm() {
 
   function handleStartOver() {
     clearSessionLessons()
+    clearSessionMeta()
     setLessons([])
+    setCourseMeta({ courseTitle: '', courseDescription: '' })
     setStreamLog([])
     setError(null)
     setSkippedCount(0)
