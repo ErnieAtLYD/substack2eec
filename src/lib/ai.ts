@@ -103,20 +103,24 @@ that together form the best EEC. The lessons array must be ordered by sequencePo
     throw new Error('Claude did not return a tool call for curation')
   }
 
-  const raw = toolBlock.input as {
-    courseTitle: string
-    courseDescription: string
-    targetAudience: string
-    overallRationale: string
-    lessons: CuratedLesson[]
+  const raw = toolBlock.input as Record<string, unknown>
+
+  if (!Array.isArray(raw.lessons)) {
+    throw new Error(
+      `Curation tool returned unexpected shape — "lessons" is ${raw.lessons === undefined ? 'missing' : typeof raw.lessons}. Raw: ${JSON.stringify(raw).slice(0, 300)}`
+    )
   }
 
+  const lessons = (raw.lessons as CuratedLesson[])
+    .slice()
+    .sort((a, b) => a.sequencePosition - b.sequencePosition)
+
   return {
-    courseTitle: raw.courseTitle,
-    courseDescription: raw.courseDescription,
-    targetAudience: raw.targetAudience,
-    overallRationale: raw.overallRationale,
-    lessons: [...raw.lessons].sort((a, b) => a.sequencePosition - b.sequencePosition),
+    courseTitle: String(raw.courseTitle ?? ''),
+    courseDescription: String(raw.courseDescription ?? ''),
+    targetAudience: String(raw.targetAudience ?? ''),
+    overallRationale: String(raw.overallRationale ?? ''),
+    lessons,
   }
 }
 
