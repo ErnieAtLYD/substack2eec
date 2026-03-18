@@ -15,34 +15,36 @@ const MODEL = 'claude-sonnet-4-6'
 // Curation (Step 1) — tool use for guaranteed structured output
 // ---------------------------------------------------------------------------
 
-const CURATION_TOOL: Anthropic.Messages.Tool = {
-  name: 'select_course_posts',
-  description: 'Select and sequence Substack posts that together form the best Educational Email Course.',
-  input_schema: {
-    type: 'object',
-    properties: {
-      courseTitle: { type: 'string', description: 'Compelling course title, ≤60 chars' },
-      courseDescription: { type: 'string', description: '2–3 sentences: what the reader will learn and why it matters' },
-      targetAudience: { type: 'string', description: 'Who this course is for, 1 sentence' },
-      overallRationale: { type: 'string', description: 'Why these posts together form a coherent course' },
-      lessons: {
-        type: 'array',
-        minItems: 1,
-        maxItems: 5,
-        items: {
-          type: 'object',
-          required: ['slug', 'sequencePosition', 'lessonFocus', 'selectionRationale'],
-          properties: {
-            slug: { type: 'string' },
-            sequencePosition: { type: 'integer', minimum: 1, maximum: 5 },
-            lessonFocus: { type: 'string', description: 'The specific angle or insight to emphasize in this lesson' },
-            selectionRationale: { type: 'string', description: 'Why this post was chosen and how it serves the course arc' },
+function buildCurationTool(lessonCount: number): Anthropic.Messages.Tool {
+  return {
+    name: 'select_course_posts',
+    description: 'Select and sequence Substack posts that together form the best Educational Email Course.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        courseTitle: { type: 'string', description: 'Compelling course title, ≤60 chars' },
+        courseDescription: { type: 'string', description: '2–3 sentences: what the reader will learn and why it matters' },
+        targetAudience: { type: 'string', description: 'Who this course is for, 1 sentence' },
+        overallRationale: { type: 'string', description: 'Why these posts together form a coherent course' },
+        lessons: {
+          type: 'array',
+          minItems: 1,
+          maxItems: lessonCount,
+          items: {
+            type: 'object',
+            required: ['slug', 'sequencePosition', 'lessonFocus', 'selectionRationale'],
+            properties: {
+              slug: { type: 'string' },
+              sequencePosition: { type: 'integer', minimum: 1, maximum: lessonCount },
+              lessonFocus: { type: 'string', description: 'The specific angle or insight to emphasize in this lesson' },
+              selectionRationale: { type: 'string', description: 'Why this post was chosen and how it serves the course arc' },
+            },
           },
         },
       },
+      required: ['courseTitle', 'courseDescription', 'targetAudience', 'overallRationale', 'lessons'],
     },
-    required: ['courseTitle', 'courseDescription', 'targetAudience', 'overallRationale', 'lessons'],
-  },
+  }
 }
 
 const CURATION_SYSTEM = `\
@@ -55,7 +57,7 @@ one coherent topic — delivered one lesson at a time.
 
 ## What makes a great EEC
 
-- Has a single teachable throughline the reader can master by lesson 5
+- Has a single teachable throughline the reader can master by the final lesson
 - Progresses logically — each lesson builds on the last (scaffolded learning)
 - Starts with motivation ("why this matters") and ends with mastery or a \
   concrete next step
@@ -77,7 +79,7 @@ function formatPostsForCuration(posts: SubstackPost[]): string {
   ).join('\n\n')
 }
 
-export async function curatePostSelection(posts: SubstackPost[]): Promise<CuratedSelection> {
+export async function curatePostSelection(posts: SubstackPost[], lessonCount: number): Promise<CuratedSelection> {
   const prompt = `\
 Below are ${posts.length} posts from a Substack newsletter archive.
 
@@ -85,7 +87,7 @@ ${formatPostsForCuration(posts)}
 
 ---
 
-Select exactly 5 posts (or fewer if the archive has fewer than 5 suitable posts) \
+Select exactly ${lessonCount} posts (or fewer if the archive has fewer than ${lessonCount} suitable posts) \
 that together form the best EEC. The lessons array must be ordered by sequencePosition \
 (1 = first email sent).`
 
@@ -93,7 +95,7 @@ that together form the best EEC. The lessons array must be ordered by sequencePo
     model: MODEL,
     max_tokens: 4096,
     system: CURATION_SYSTEM,
-    tools: [CURATION_TOOL],
+    tools: [buildCurationTool(lessonCount)],
     tool_choice: { type: 'tool', name: 'select_course_posts' },
     messages: [{ role: 'user', content: prompt }],
   })
@@ -160,7 +162,7 @@ const LESSON_SCHEMA = `\
 
 **Key takeaway:** [one bold sentence]
 
-**Next lesson:** [one-sentence teaser for the next lesson, or omit on lesson 5]`
+**Next lesson:** [one-sentence teaser for the next lesson, or omit on the final lesson]`
 
 function buildRewriteSystem(): string {
   return `\

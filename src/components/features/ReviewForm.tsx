@@ -60,6 +60,7 @@ function clearSessionLessons() {
 export default function ReviewForm() {
   const [step, setStep] = useState<Step>('input')
   const [url, setUrl] = useState('')
+  const [lessonCount, setLessonCount] = useState<number>(5)
   const [lessons, setLessons] = useState<GeneratedLesson[]>([])
   const [courseMeta, setCourseMeta] = useState<CourseMeta>({ courseTitle: '', courseDescription: '' })
   const [streamLog, setStreamLog] = useState<string[]>([])
@@ -135,7 +136,7 @@ export default function ReviewForm() {
       const res = await fetch('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ posts }),
+        body: JSON.stringify({ posts, lessonCount }),
       })
 
       if (!res.ok || !res.body) {
@@ -263,7 +264,7 @@ export default function ReviewForm() {
     <div className="max-w-3xl mx-auto px-4 py-12">
       <h1 className="text-3xl font-bold mb-2">Substack → Email Course</h1>
       <p className="text-gray-500 mb-8 text-sm">
-        Paste a Substack URL and get a 5-lesson email course, ready to export.
+        Paste a Substack URL and get a {lessonCount}-lesson email course, ready to export.
       </p>
 
       {error && (
@@ -274,21 +275,39 @@ export default function ReviewForm() {
 
       {/* INPUT */}
       {step === 'input' && (
-        <form onSubmit={handleGenerate} className="flex gap-3">
-          <input
-            type="url"
-            value={url}
-            onChange={e => setUrl(e.target.value)}
-            placeholder="https://example.substack.com"
-            required
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          <button
-            type="submit"
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            Generate Course
-          </button>
+        <form onSubmit={handleGenerate} className="space-y-4">
+          <div className="flex gap-3">
+            <input
+              type="url"
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+              placeholder="https://example.substack.com"
+              required
+              className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              type="submit"
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              Generate Course
+            </button>
+          </div>
+          <div className="flex items-center gap-4 text-sm text-gray-600">
+            <span className="font-medium">Course length:</span>
+            {[3, 5, 7, 10].map(n => (
+              <label key={n} className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="lessonCount"
+                  value={n}
+                  checked={lessonCount === n}
+                  onChange={() => setLessonCount(n)}
+                  className="accent-indigo-600"
+                />
+                {n} lessons
+              </label>
+            ))}
+          </div>
         </form>
       )}
 
@@ -322,9 +341,9 @@ export default function ReviewForm() {
               {skippedCount} paywalled post{skippedCount !== 1 ? 's' : ''} were skipped.
             </p>
           )}
-          {lessons.length < 5 && (
+          {lessons.length < lessonCount && (
             <p className="text-sm text-amber-600">
-              Only {lessons.length} suitable public post{lessons.length !== 1 ? 's' : ''} found — course is shorter than 5 lessons.
+              Only {lessons.length} suitable public post{lessons.length !== 1 ? 's' : ''} found — course is shorter than {lessonCount} lessons.
             </p>
           )}
 

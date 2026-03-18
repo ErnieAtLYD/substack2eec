@@ -27,7 +27,10 @@ export async function POST(request: NextRequest): Promise<Response> {
 
       try {
         // Step 1: Curation
-        const selection = await curatePostSelection(body.posts)
+        const lessonCount = typeof body.lessonCount === 'number' && body.lessonCount > 0
+          ? body.lessonCount
+          : 5
+        const selection = await curatePostSelection(body.posts, lessonCount)
         enqueue({ type: 'selection', data: selection })
 
         // Step 2: Rewrite each selected lesson in sequence

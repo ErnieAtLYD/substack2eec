@@ -47,6 +47,7 @@ export interface FetchPostsResponse {
 
 export interface CurateRequest {
   posts: SubstackPost[]
+  lessonCount: number
 }
 
 export interface ExportRequest {
