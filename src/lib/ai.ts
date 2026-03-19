@@ -11,6 +11,10 @@ function getClient(): Anthropic {
 
 const MODEL = 'claude-sonnet-4-6'
 
+function xmlEscape(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 // ---------------------------------------------------------------------------
 // Curation (Step 1) — tool use for guaranteed structured output
 // ---------------------------------------------------------------------------
@@ -223,12 +227,12 @@ export async function* rewriteAsLesson(
 
   const lessonInstructions = `\
 <source_material>
-${post.bodyText}
+${xmlEscape(post.bodyText)}
 </source_material>
 
 <lesson>
   <number>${lessonNum}</number>
-  <focus>${focus}</focus>
+  <focus>${xmlEscape(focus)}</focus>
   <position>${positionHint(lessonNum, total)}</position>
 </lesson>
 

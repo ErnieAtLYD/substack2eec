@@ -45,9 +45,12 @@ export interface FetchPostsResponse {
   skippedCount: number  // paywalled posts skipped
 }
 
+export const ALLOWED_LESSON_COUNTS = [3, 5, 7, 10] as const
+export type LessonCount = typeof ALLOWED_LESSON_COUNTS[number]
+
 export interface CurateRequest {
   posts: SubstackPost[]
-  lessonCount: number
+  lessonCount?: number  // optional; validated server-side, defaults to 5
 }
 
 export interface ExportRequest {

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown } from '@/lib/ai'
-import type { CurateRequest, GeneratedLesson, CurateSSEEvent } from '@/types'
+import type { CurateRequest, GeneratedLesson, CurateSSEEvent, LessonCount } from '@/types'
+import { ALLOWED_LESSON_COUNTS } from '@/types'
 
 export const maxDuration = 180
 
@@ -18,6 +19,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     )
   }
 
+  if (body.posts.length > 50) {
+    return new Response(
+      sseEvent({ type: 'error', message: 'Too many posts (max 50)' }),
+      { status: 400, headers: { 'Content-Type': 'text/event-stream' } },
+    )
+  }
+
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -27,8 +35,8 @@ export async function POST(request: NextRequest): Promise<Response> {
 
       try {
         // Step 1: Curation
-        const lessonCount = typeof body.lessonCount === 'number' && body.lessonCount > 0
-          ? body.lessonCount
+        const lessonCount: LessonCount = (ALLOWED_LESSON_COUNTS as readonly number[]).includes(body.lessonCount as number)
+          ? body.lessonCount as LessonCount
           : 5
         const selection = await curatePostSelection(body.posts, lessonCount)
         enqueue({ type: 'selection', data: selection })

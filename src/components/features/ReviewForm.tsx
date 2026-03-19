@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import type { SubstackPost, GeneratedLesson, CurateSSEEvent } from '@/types'
+import type { SubstackPost, GeneratedLesson, CurateSSEEvent, LessonCount } from '@/types'
+import { ALLOWED_LESSON_COUNTS } from '@/types'
 
 type Step = 'input' | 'fetching' | 'generating' | 'review' | 'downloading'
 
@@ -60,7 +61,7 @@ function clearSessionLessons() {
 export default function ReviewForm() {
   const [step, setStep] = useState<Step>('input')
   const [url, setUrl] = useState('')
-  const [lessonCount, setLessonCount] = useState<number>(5)
+  const [lessonCount, setLessonCount] = useState<LessonCount>(5)
   const [lessons, setLessons] = useState<GeneratedLesson[]>([])
   const [courseMeta, setCourseMeta] = useState<CourseMeta>({ courseTitle: '', courseDescription: '' })
   const [streamLog, setStreamLog] = useState<string[]>([])
@@ -294,7 +295,7 @@ export default function ReviewForm() {
           </div>
           <div className="flex items-center gap-4 text-sm text-gray-600">
             <span className="font-medium">Course length:</span>
-            {[3, 5, 7, 10].map(n => (
+            {ALLOWED_LESSON_COUNTS.map(n => (
               <label key={n} className="flex items-center gap-1.5 cursor-pointer">
                 <input
                   type="radio"
