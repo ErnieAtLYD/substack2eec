@@ -11,10 +11,12 @@ export const MAX_POST_WORDS = 2500
 export function normalizeSubstackUrl(raw: string): string {
   try {
     const url = new URL(raw.trim())
-    if (!url.hostname.includes('.')) throw new Error('Invalid hostname')
+    if (!url.hostname.endsWith('.substack.com')) {
+      throw new Error('URL must be a substack.com publication')
+    }
     return url.hostname  // e.g. "example.substack.com"
-  } catch {
-    throw new Error(`Invalid Substack URL: "${raw}"`)
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : `Invalid Substack URL: "${raw}"`)
   }
 }
 

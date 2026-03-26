@@ -69,6 +69,7 @@ export default function ReviewForm() {
   const [error, setError] = useState<string | null>(null)
   const [skippedCount, setSkippedCount] = useState(0)
   const [expectedLessonCount, setExpectedLessonCount] = useState<number>(lessonCount)
+  const [completedLessonCount, setCompletedLessonCount] = useState(0)
 
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -105,6 +106,7 @@ export default function ReviewForm() {
     setError(null)
     setStreamLog([])
     setExpectedLessonCount(lessonCount)
+    setCompletedLessonCount(0)
     setStep('fetching')
 
     // Step 1: Fetch posts
@@ -182,6 +184,7 @@ export default function ReviewForm() {
             inProgressLessons.push(event.lesson)
             // Append to sessionStorage as each lesson arrives
             writeSessionLessons([...inProgressLessons])
+            setCompletedLessonCount(inProgressLessons.length)
             setStreamLog(prev => [...prev, `✓ Lesson ${event.lesson.lessonNumber}: ${event.lesson.title}`])
           } else if (event.type === 'done') {
             clearSlowTimer()
@@ -253,6 +256,7 @@ export default function ReviewForm() {
     setError(null)
     setSkippedCount(0)
     setExpectedLessonCount(lessonCount)
+    setCompletedLessonCount(0)
     setStep('input')
   }
 
@@ -337,45 +341,42 @@ export default function ReviewForm() {
       )}
 
       {/* GENERATING */}
-      {step === 'generating' && (() => {
-        const completedCount = streamLog.filter(l => l.startsWith('✓ Lesson ')).length
-        return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-700 animate-pulse">Generating your course…</p>
-              {completedCount > 0 && (
-                <span className="text-sm font-semibold tabular-nums text-indigo-600">
-                  {completedCount} / {expectedLessonCount} lessons
-                </span>
-              )}
-            </div>
-            {completedCount > 0 && (
-              <div className="h-1.5 w-full rounded-full bg-gray-100">
-                <div
-                  className="h-1.5 rounded-full bg-indigo-500 transition-all duration-500"
-                  style={{ width: `${(completedCount / expectedLessonCount) * 100}%` }}
-                />
-              </div>
+      {step === 'generating' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-gray-700 animate-pulse">Generating your course…</p>
+            {completedLessonCount > 0 && (
+              <span className="text-sm font-semibold tabular-nums text-indigo-600">
+                {completedLessonCount} / {expectedLessonCount} lessons
+              </span>
             )}
-            {slowWarning && (
-              <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
-                This is taking longer than usual — still working…
-              </div>
-            )}
-            <ul className="space-y-1.5 text-sm">
-              {streamLog.map((line, i) => (
-                <li key={i} className={['flex items-start gap-2', line.startsWith('✓') ? 'text-gray-700' : 'text-gray-400'].join(' ')}>
-                  {line.startsWith('✓')
-                    ? <span className="mt-0.5 text-green-500 shrink-0">✓</span>
-                    : <span className="mt-0.5 shrink-0 text-gray-300">·</span>
-                  }
-                  <span>{line.startsWith('✓') ? line.slice(2) : line}</span>
-                </li>
-              ))}
-            </ul>
           </div>
-        )
-      })()}
+          {completedLessonCount > 0 && (
+            <div className="h-1.5 w-full rounded-full bg-gray-100">
+              <div
+                className="h-1.5 rounded-full bg-indigo-500 transition-all duration-500"
+                style={{ width: `${(completedLessonCount / expectedLessonCount) * 100}%` }}
+              />
+            </div>
+          )}
+          {slowWarning && (
+            <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
+              This is taking longer than usual — still working…
+            </div>
+          )}
+          <ul className="space-y-1.5 text-sm">
+            {streamLog.map((line, i) => (
+              <li key={i} className={['flex items-start gap-2', line.startsWith('✓') ? 'text-gray-700' : 'text-gray-400'].join(' ')}>
+                {line.startsWith('✓')
+                  ? <span className="mt-0.5 text-green-500 shrink-0">✓</span>
+                  : <span className="mt-0.5 shrink-0 text-gray-300">·</span>
+                }
+                <span>{line.startsWith('✓') ? line.slice(2) : line}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* REVIEW */}
       {step === 'review' && (
