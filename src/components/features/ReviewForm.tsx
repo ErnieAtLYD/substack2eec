@@ -68,6 +68,7 @@ export default function ReviewForm() {
   const [slowWarning, setSlowWarning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [skippedCount, setSkippedCount] = useState(0)
+  const [expectedLessonCount, setExpectedLessonCount] = useState<number>(lessonCount)
 
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -103,6 +104,7 @@ export default function ReviewForm() {
     e.preventDefault()
     setError(null)
     setStreamLog([])
+    setExpectedLessonCount(lessonCount)
     setStep('fetching')
 
     // Step 1: Fetch posts
@@ -172,6 +174,7 @@ export default function ReviewForm() {
             const meta = { courseTitle: event.data.courseTitle, courseDescription: event.data.courseDescription }
             setCourseMeta(meta)
             writeSessionMeta(meta)
+            setExpectedLessonCount(event.data.lessons.length)
             setStreamLog(prev => [...prev, `Course: "${event.data.courseTitle}"`])
           } else if (event.type === 'lesson_start') {
             setStreamLog(prev => [...prev, `Writing lesson ${event.lessonNumber}…`])
@@ -203,8 +206,10 @@ export default function ReviewForm() {
       clearSlowTimer()
       // Recover partial lessons from sessionStorage if stream died
       const saved = readSessionLessons()
+      const meta = readSessionMeta()
       if (saved && saved.length > 0) {
         setLessons(saved)
+        if (meta) setCourseMeta(meta)
         setError('Generation interrupted. Showing lessons completed so far.')
         setStep('review')
       } else {
@@ -247,6 +252,7 @@ export default function ReviewForm() {
     setStreamLog([])
     setError(null)
     setSkippedCount(0)
+    setExpectedLessonCount(lessonCount)
     setStep('input')
   }
 
@@ -263,7 +269,15 @@ export default function ReviewForm() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold mb-2">Substack → Email Course</h1>
+      <div className="flex items-center gap-3 mb-2">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+            <path d="M3 4a2 2 0 0 0-2 2v1.161l8.441 4.221a1.25 1.25 0 0 0 1.118 0L19 7.162V6a2 2 0 0 0-2-2H3Z" />
+            <path d="m19 8.839-7.77 3.885a2.75 2.75 0 0 1-2.46 0L1 8.839V14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.839Z" />
+          </svg>
+        </span>
+        <h1 className="text-2xl font-bold tracking-tight">Substack to Email Course</h1>
+      </div>
       <p className="text-gray-500 mb-8 text-sm">
         Paste a Substack URL and get a {lessonCount}-lesson email course, ready to export.
       </p>
@@ -293,21 +307,26 @@ export default function ReviewForm() {
               Generate Course
             </button>
           </div>
-          <div className="flex items-center gap-4 text-sm text-gray-600">
-            <span className="font-medium">Course length:</span>
-            {ALLOWED_LESSON_COUNTS.map(n => (
-              <label key={n} className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="lessonCount"
-                  value={n}
-                  checked={lessonCount === n}
-                  onChange={() => setLessonCount(n)}
-                  className="accent-indigo-600"
-                />
-                {n} lessons
-              </label>
-            ))}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="font-medium text-gray-700">Length:</span>
+            <div className="flex gap-1">
+              {ALLOWED_LESSON_COUNTS.map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setLessonCount(n)}
+                  className={[
+                    'rounded-full px-3 py-1 text-sm font-medium transition-colors',
+                    lessonCount === n
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white border border-gray-300 text-gray-600 hover:border-indigo-400 hover:text-indigo-600',
+                  ].join(' ')}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <span className="text-gray-400">lessons</span>
           </div>
         </form>
       )}
@@ -318,25 +337,58 @@ export default function ReviewForm() {
       )}
 
       {/* GENERATING */}
-      {step === 'generating' && (
-        <div className="space-y-4">
-          <div className="text-sm font-medium text-gray-700">Generating your course…</div>
-          {slowWarning && (
-            <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
-              This is taking longer than usual — still working…
+      {step === 'generating' && (() => {
+        const completedCount = streamLog.filter(l => l.startsWith('✓ Lesson ')).length
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gray-700 animate-pulse">Generating your course…</p>
+              {completedCount > 0 && (
+                <span className="text-sm font-semibold tabular-nums text-indigo-600">
+                  {completedCount} / {expectedLessonCount} lessons
+                </span>
+              )}
             </div>
-          )}
-          <ul className="space-y-1 text-sm text-gray-600">
-            {streamLog.map((line, i) => (
-              <li key={i}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+            {completedCount > 0 && (
+              <div className="h-1.5 w-full rounded-full bg-gray-100">
+                <div
+                  className="h-1.5 rounded-full bg-indigo-500 transition-all duration-500"
+                  style={{ width: `${(completedCount / expectedLessonCount) * 100}%` }}
+                />
+              </div>
+            )}
+            {slowWarning && (
+              <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
+                This is taking longer than usual — still working…
+              </div>
+            )}
+            <ul className="space-y-1.5 text-sm">
+              {streamLog.map((line, i) => (
+                <li key={i} className={['flex items-start gap-2', line.startsWith('✓') ? 'text-gray-700' : 'text-gray-400'].join(' ')}>
+                  {line.startsWith('✓')
+                    ? <span className="mt-0.5 text-green-500 shrink-0">✓</span>
+                    : <span className="mt-0.5 shrink-0 text-gray-300">·</span>
+                  }
+                  <span>{line.startsWith('✓') ? line.slice(2) : line}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })()}
 
       {/* REVIEW */}
       {step === 'review' && (
         <div className="space-y-8">
+          {courseMeta.courseTitle && (
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-indigo-400 mb-0.5">Course</p>
+              <p className="text-base font-semibold text-indigo-900">{courseMeta.courseTitle}</p>
+              {courseMeta.courseDescription && (
+                <p className="mt-1 text-sm text-indigo-700">{courseMeta.courseDescription}</p>
+              )}
+            </div>
+          )}
           {skippedCount > 0 && (
             <p className="text-sm text-gray-500">
               {skippedCount} paywalled post{skippedCount !== 1 ? 's' : ''} were skipped.
@@ -349,18 +401,22 @@ export default function ReviewForm() {
           )}
 
           {lessons.map((lesson, i) => (
-            <div key={lesson.lessonNumber} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono text-gray-400">{lesson.filename}</span>
-                <span className="text-xs text-gray-400">
-                  Subject: {lesson.subjectLine}
+            <div key={lesson.lessonNumber} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                  {lesson.lessonNumber}
                 </span>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-800" title={lesson.title}>{lesson.title}</p>
+                  <p className="truncate text-xs text-gray-400 mt-0.5">Subject: {lesson.subjectLine}</p>
+                </div>
+                <span className="shrink-0 font-mono text-xs text-gray-300 hidden sm:block">{lesson.filename}</span>
               </div>
               <textarea
                 value={lesson.markdownBody}
                 onChange={e => handleLessonEdit(i, e.target.value)}
                 rows={20}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 resize-y"
               />
             </div>
           ))}
