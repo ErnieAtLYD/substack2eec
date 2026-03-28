@@ -1,7 +1,7 @@
 ---
 title: "fix: Resolve P2 pre-merge todos 015, 023, 024, 025, 029"
 type: fix
-status: active
+status: completed
 date: 2026-03-28
 ---
 
