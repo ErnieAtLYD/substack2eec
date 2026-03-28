@@ -247,7 +247,7 @@ export default function ReviewForm() {
       a.href = href
       a.download = 'eec-course.zip'
       a.click()
-      setTimeout(() => URL.revokeObjectURL(href), 60)
+      setTimeout(() => URL.revokeObjectURL(href), 60_000)
       setStep('review')
     } catch {
       setError('Download failed. Please try again.')
