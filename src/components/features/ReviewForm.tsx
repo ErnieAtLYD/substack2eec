@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { SubstackPost, GeneratedLesson, CurateSSEEvent, LessonCount } from '@/types'
-import { ALLOWED_LESSON_COUNTS } from '@/types'
+import type { SubstackPost, GeneratedLesson, CurateSSEEvent } from '@/types'
 
 type Step = 'input' | 'fetching' | 'generating' | 'review' | 'downloading'
 
@@ -26,7 +25,11 @@ function readSessionMeta(): CourseMeta | null {
 function writeSessionMeta(meta: CourseMeta) {
   try {
     sessionStorage.setItem(SESSION_META_KEY, JSON.stringify(meta))
-  } catch {}
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+      console.warn('[substack2eec] sessionStorage quota exceeded — course meta will not be saved')
+    }
+  }
 }
 
 function clearSessionMeta() {
@@ -47,8 +50,11 @@ function readSessionLessons(): GeneratedLesson[] | null {
 function writeSessionLessons(lessons: GeneratedLesson[]) {
   try {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(lessons))
-  } catch {
-    // sessionStorage not available (SSR guard)
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+      console.warn('[substack2eec] sessionStorage quota exceeded — lesson progress will not be saved on refresh')
+    }
+    // Silently ignore other errors (SSR environment, private mode, etc.)
   }
 }
 
@@ -67,14 +73,13 @@ const EXAMPLES = [
 export default function ReviewForm() {
   const [step, setStep] = useState<Step>('input')
   const [url, setUrl] = useState('')
-  const [lessonCount, setLessonCount] = useState<LessonCount>(5)
   const [lessons, setLessons] = useState<GeneratedLesson[]>([])
   const [courseMeta, setCourseMeta] = useState<CourseMeta>({ courseTitle: '', courseDescription: '' })
   const [streamLog, setStreamLog] = useState<string[]>([])
   const [slowWarning, setSlowWarning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [skippedCount, setSkippedCount] = useState(0)
-  const [expectedLessonCount, setExpectedLessonCount] = useState<number>(lessonCount)
+  const [expectedLessonCount, setExpectedLessonCount] = useState<number>(5)
   const [completedLessonCount, setCompletedLessonCount] = useState(0)
 
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -111,7 +116,7 @@ export default function ReviewForm() {
     e.preventDefault()
     setError(null)
     setStreamLog([])
-    setExpectedLessonCount(lessonCount)
+    setExpectedLessonCount(5)
     setCompletedLessonCount(0)
     setStep('fetching')
 
@@ -147,7 +152,7 @@ export default function ReviewForm() {
       const res = await fetch('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ posts, lessonCount }),
+        body: JSON.stringify({ posts, lessonCount: 5 }),
       })
 
       if (!res.ok || !res.body) {
@@ -263,7 +268,7 @@ export default function ReviewForm() {
     setStreamLog([])
     setError(null)
     setSkippedCount(0)
-    setExpectedLessonCount(lessonCount)
+    setExpectedLessonCount(5)
     setCompletedLessonCount(0)
     setStep('input')
   }
@@ -333,13 +338,14 @@ export default function ReviewForm() {
                   type="url"
                   value={url}
                   onChange={e => setUrl(e.target.value)}
-                  placeholder="yourname.substack.com"
+                  placeholder="https://yourname.substack.com"
                   required
                   className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
                 />
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-500 hover:bg-gray-600 px-5 py-3 text-sm font-medium text-white transition-colors"
+                  disabled={!url || step !== 'input'}
+                  className="inline-flex items-center gap-2 rounded-lg bg-gray-500 hover:bg-gray-600 px-5 py-3 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                     <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.897l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684Z" />
@@ -370,7 +376,7 @@ export default function ReviewForm() {
 
               {/* Feature badges */}
               <div className="flex items-center justify-center gap-2 text-xs text-gray-400 flex-wrap">
-                <span>{lessonCount === 5 ? '3–5' : lessonCount} emails per course</span>
+                <span>3–5 emails per course</span>
                 <span>·</span>
                 <span>Key takeaways included</span>
                 <span>·</span>
@@ -442,9 +448,9 @@ export default function ReviewForm() {
                 {skippedCount} paywalled post{skippedCount !== 1 ? 's' : ''} were skipped.
               </p>
             )}
-            {lessons.length < lessonCount && (
+            {lessons.length < expectedLessonCount && (
               <p className="text-sm text-amber-600">
-                Only {lessons.length} suitable public post{lessons.length !== 1 ? 's' : ''} found — course is shorter than {lessonCount} lessons.
+                Only {lessons.length} suitable public post{lessons.length !== 1 ? 's' : ''} found — course is shorter than expected.
               </p>
             )}
 
