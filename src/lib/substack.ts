@@ -8,9 +8,14 @@ export const MAX_POST_WORDS = 2500
 // URL helpers
 // ---------------------------------------------------------------------------
 
+const ALLOWED_PROTOCOLS = new Set(['https:', 'http:'])
+
 export function normalizeSubstackUrl(raw: string): string {
   try {
     const url = new URL(raw.trim())
+    if (!ALLOWED_PROTOCOLS.has(url.protocol)) {
+      throw new Error('URL must use https://')
+    }
     if (!url.hostname.endsWith('.substack.com')) {
       throw new Error('URL must be a substack.com publication')
     }

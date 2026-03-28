@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { SubstackPost, GeneratedLesson, CurateSSEEvent, LessonCount } from '@/types'
 import { ALLOWED_LESSON_COUNTS } from '@/types'
 
@@ -57,6 +57,12 @@ function clearSessionLessons() {
     sessionStorage.removeItem(SESSION_KEY)
   } catch {}
 }
+
+const EXAMPLES = [
+  { label: 'Noahpinion',       url: 'https://noahpinion.substack.com' },
+  { label: 'Astral Codex Ten', url: 'https://astralcodexten.substack.com' },
+  { label: 'Not Boring',       url: 'https://notboring.substack.com' },
+] as const
 
 export default function ReviewForm() {
   const [step, setStep] = useState<Step>('input')
@@ -236,15 +242,17 @@ export default function ReviewForm() {
         return
       }
       const blob = await res.blob()
+      const href = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
+      a.href = href
       a.download = 'eec-course.zip'
       a.click()
-      URL.revokeObjectURL(a.href)
+      setTimeout(() => URL.revokeObjectURL(href), 60)
+      setStep('review')
     } catch {
       setError('Download failed. Please try again.')
+      setStep('review')
     }
-    setStep('review')
   }
 
   function handleStartOver() {
@@ -260,22 +268,19 @@ export default function ReviewForm() {
     setStep('input')
   }
 
-  function handleLessonEdit(index: number, value: string) {
-    const updated = lessons.map((l, i) =>
-      i === index ? { ...l, markdownBody: value } : l
-    )
-    updateLessons(updated)
-  }
+  const handleLessonEdit = useCallback((index: number, value: string) => {
+    setLessons(prev => {
+      const updated = prev.map((l, i) =>
+        i === index ? { ...l, markdownBody: value } : l
+      )
+      writeSessionLessons(updated)
+      return updated
+    })
+  }, [])
 
   // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
-
-  const examples = [
-    { label: "Lenny's Newsletter", url: 'https://www.lennysnewsletter.com' },
-    { label: 'The Generalist', url: 'https://www.generalist.com' },
-    { label: 'Not Boring', url: 'https://www.notboring.co' },
-  ]
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -350,7 +355,7 @@ export default function ReviewForm() {
               <div className="text-center mb-6">
                 <p className="text-sm text-gray-500 mb-3">Try an example:</p>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {examples.map(ex => (
+                  {EXAMPLES.map(ex => (
                     <button
                       key={ex.label}
                       type="button"
