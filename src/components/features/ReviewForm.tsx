@@ -90,6 +90,7 @@ export default function ReviewForm() {
     const meta = readSessionMeta()
     if (saved && saved.length > 0) {
       setLessons(saved)
+      setExpectedLessonCount(saved.length)
       if (meta) setCourseMeta(meta)
       setStep('review')
     }
