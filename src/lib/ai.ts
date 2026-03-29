@@ -70,15 +70,19 @@ one coherent topic — delivered one lesson at a time.
 - Avoids redundancy — each selected post contributes something distinct
 - Favors posts with enough substance to fill a 3–5 minute read`
 
+function sanitizeForPrompt(s: string): string {
+  return s.replace(/[\n\r]/g, ' ').slice(0, 300)
+}
+
 function formatPostsForCuration(posts: SubstackPost[]): string {
   return posts.map((p, i) =>
     [
-      `[${i + 1}] slug: ${p.slug}`,
-      `    title: ${p.title}`,
-      p.subtitle ? `    subtitle: ${p.subtitle}` : null,
+      `[${i + 1}] slug: ${sanitizeForPrompt(p.slug)}`,
+      `    title: ${sanitizeForPrompt(p.title)}`,
+      p.subtitle ? `    subtitle: ${sanitizeForPrompt(p.subtitle)}` : null,
       `    published: ${p.publishedAt.slice(0, 10)}`,
       `    words: ${p.wordCount}`,
-      `    excerpt: ${p.excerpt}`,
+      `    excerpt: ${sanitizeForPrompt(p.excerpt)}`,
     ].filter(Boolean).join('\n')
   ).join('\n\n')
 }
@@ -193,14 +197,14 @@ function buildCourseContextBlock(
   priorLessons: GeneratedLesson[],
 ): string {
   const prior = priorLessons.length > 0
-    ? priorLessons.map(l => `  Lesson ${l.lessonNumber}: ${l.title} — ${l.keyTakeaway}`).join('\n')
+    ? priorLessons.map(l => `  Lesson ${l.lessonNumber}: ${xmlEscape(l.title)} — ${xmlEscape(l.keyTakeaway)}`).join('\n')
     : '  (none yet)'
 
   return `<course>
-<title>${selection.courseTitle}</title>
-<description>${selection.courseDescription}</description>
-<audience>${selection.targetAudience}</audience>
-<arc>${selection.overallRationale}</arc>
+<title>${xmlEscape(selection.courseTitle)}</title>
+<description>${xmlEscape(selection.courseDescription)}</description>
+<audience>${xmlEscape(selection.targetAudience)}</audience>
+<arc>${xmlEscape(selection.overallRationale)}</arc>
 <prior_lessons>
 ${prior}
 </prior_lessons>
