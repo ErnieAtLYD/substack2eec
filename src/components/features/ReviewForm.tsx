@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { SubstackPost, GeneratedLesson, CurateSSEEvent } from '@/types'
 
 type Step = 'input' | 'fetching' | 'generating' | 'review' | 'downloading'
+
+type LogEntry = { text: string; done: boolean }
 
 const SESSION_KEY = 'eec_lessons'
 const SESSION_META_KEY = 'eec_meta'
@@ -75,7 +77,7 @@ export default function ReviewForm() {
   const [url, setUrl] = useState('')
   const [lessons, setLessons] = useState<GeneratedLesson[]>([])
   const [courseMeta, setCourseMeta] = useState<CourseMeta>({ courseTitle: '', courseDescription: '' })
-  const [streamLog, setStreamLog] = useState<string[]>([])
+  const [streamLog, setStreamLog] = useState<LogEntry[]>([])
   const [slowWarning, setSlowWarning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [skippedCount, setSkippedCount] = useState(0)
@@ -189,15 +191,15 @@ export default function ReviewForm() {
             setCourseMeta(meta)
             writeSessionMeta(meta)
             setExpectedLessonCount(event.data.lessons.length)
-            setStreamLog(prev => [...prev, `Course: "${event.data.courseTitle}"`])
+            setStreamLog(prev => [...prev, { text: `Course: "${event.data.courseTitle}"`, done: false }])
           } else if (event.type === 'lesson_start') {
-            setStreamLog(prev => [...prev, `Writing lesson ${event.lessonNumber}…`])
+            setStreamLog(prev => [...prev, { text: `Writing lesson ${event.lessonNumber}…`, done: false }])
           } else if (event.type === 'lesson_done') {
             inProgressLessons.push(event.lesson)
             // Append to sessionStorage as each lesson arrives
             writeSessionLessons([...inProgressLessons])
             setCompletedLessonCount(inProgressLessons.length)
-            setStreamLog(prev => [...prev, `✓ Lesson ${event.lesson.lessonNumber}: ${event.lesson.title}`])
+            setStreamLog(prev => [...prev, { text: `Lesson ${event.lesson.lessonNumber}: ${event.lesson.title}`, done: true }])
           } else if (event.type === 'done') {
             clearSlowTimer()
             updateLessons(event.lessons)
@@ -274,7 +276,7 @@ export default function ReviewForm() {
     setStep('input')
   }
 
-  const handleLessonEdit = useCallback((index: number, value: string) => {
+  const handleLessonEdit = (index: number, value: string) => {
     setLessons(prev => {
       const updated = prev.map((l, i) =>
         i === index ? { ...l, markdownBody: value } : l
@@ -282,7 +284,7 @@ export default function ReviewForm() {
       writeSessionLessons(updated)
       return updated
     })
-  }, [])
+  }
 
   // -------------------------------------------------------------------------
   // Render
@@ -292,11 +294,11 @@ export default function ReviewForm() {
     <div className="flex flex-col min-h-screen">
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-16">
 
-        {/* Page header */}
-        {(step === 'input' || step === 'fetching' || step === 'generating') && (
+        {/* Page header — not shown during input because the card has its own icon+heading */}
+        {(step === 'fetching' || step === 'generating') && (
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gray-100 mb-6">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-gray-700">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-gray-700">
                 <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
                 <path d="M6 12v5c3 3 9 3 12 0v-5" />
               </svg>
@@ -321,7 +323,7 @@ export default function ReviewForm() {
             {/* Card icon + heading */}
             <div className="flex flex-col items-center text-center mb-8">
               <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gray-100 mb-5">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-gray-700">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-gray-700">
                   <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
                   <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
                 </svg>
@@ -348,11 +350,11 @@ export default function ReviewForm() {
                   disabled={!url || step !== 'input'}
                   className="inline-flex items-center gap-2 rounded-lg bg-gray-500 hover:bg-gray-600 px-5 py-3 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                  <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                     <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.897l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684Z" />
                   </svg>
                   Generate Courses
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                  <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                     <path fillRule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clipRule="evenodd" />
                   </svg>
                 </button>
@@ -419,13 +421,14 @@ export default function ReviewForm() {
               </div>
             )}
             <ul className="space-y-1.5 text-sm">
-              {streamLog.map((line, i) => (
-                <li key={i} className={['flex items-start gap-2', line.startsWith('✓') ? 'text-gray-700' : 'text-gray-400'].join(' ')}>
-                  {line.startsWith('✓')
+              {streamLog.map((entry, i) => (
+                // stable enough — entries are append-only
+                <li key={i} className={['flex items-start gap-2', entry.done ? 'text-gray-700' : 'text-gray-400'].join(' ')}>
+                  {entry.done
                     ? <span className="mt-0.5 text-green-500 shrink-0">✓</span>
                     : <span className="mt-0.5 shrink-0 text-gray-300">·</span>
                   }
-                  <span>{line.startsWith('✓') ? line.slice(2) : line}</span>
+                  <span>{entry.text}</span>
                 </li>
               ))}
             </ul>
@@ -495,7 +498,9 @@ export default function ReviewForm() {
 
         {/* DOWNLOADING */}
         {step === 'downloading' && (
-          <div className="text-sm text-gray-500 animate-pulse">Preparing your ZIP…</div>
+          <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-lg px-8 py-12 text-center">
+            <p className="text-sm text-gray-500 animate-pulse">Preparing your ZIP…</p>
+          </div>
         )}
 
       </div>
