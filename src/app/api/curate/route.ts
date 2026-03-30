@@ -28,7 +28,7 @@ function sseEvent(data: CurateSSEEvent): string {
 }
 
 function isLessonCount(value: unknown): value is LessonCount {
-  return ALLOWED_LESSON_COUNTS.includes(value as LessonCount)
+  return (ALLOWED_LESSON_COUNTS as ReadonlyArray<unknown>).includes(value)
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
