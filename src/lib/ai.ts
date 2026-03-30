@@ -11,8 +11,17 @@ function getClient(): Anthropic {
 
 const MODEL = 'claude-sonnet-4-6'
 
+const MAX_PROMPT_FIELD_LEN = 300
+
+// Escapes XML element content. NOT safe for XML attribute values (does not escape quotes).
+// If embedding in an attribute value context, also escape " and '.
 function xmlEscape(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 // ---------------------------------------------------------------------------
@@ -70,17 +79,19 @@ one coherent topic — delivered one lesson at a time.
 - Avoids redundancy — each selected post contributes something distinct
 - Favors posts with enough substance to fill a 3–5 minute read`
 
+// Sanitizes user-controlled strings for plain-text prompt context: collapses whitespace
+// and caps length. For XML block context, also apply xmlEscape after this call.
 function sanitizeForPrompt(s: string): string {
-  return s.replace(/[\n\r]/g, ' ').slice(0, 300)
+  return s.slice(0, MAX_PROMPT_FIELD_LEN).replace(/[\n\r\t]/g, ' ')
 }
 
 function formatPostsForCuration(posts: SubstackPost[]): string {
   return posts.map((p, i) =>
     [
-      `[${i + 1}] slug: ${sanitizeForPrompt(p.slug)}`,
+      `[${i + 1}] slug: ${p.slug}`,
       `    title: ${sanitizeForPrompt(p.title)}`,
       p.subtitle ? `    subtitle: ${sanitizeForPrompt(p.subtitle)}` : null,
-      `    published: ${p.publishedAt.slice(0, 10)}`,
+      `    published: ${sanitizeForPrompt(p.publishedAt).slice(0, 10)}`,
       `    words: ${p.wordCount}`,
       `    excerpt: ${sanitizeForPrompt(p.excerpt)}`,
     ].filter(Boolean).join('\n')
