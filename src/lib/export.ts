@@ -7,13 +7,16 @@ export function buildReadme(
   courseDescription: string,
   lessons: GeneratedLesson[],
 ): string {
+  const safeTitle = (courseTitle ?? '').slice(0, 200)
+  const safeDescription = (courseDescription ?? '').slice(0, 1000)
+
   const toc = lessons
     .map(l => `${l.lessonNumber}. **${l.title}** — ${l.filename}`)
     .join('\n')
 
-  return `# ${courseTitle}
+  return `# ${safeTitle}
 
-${courseDescription}
+${safeDescription}
 
 ## Lessons
 
