@@ -14,7 +14,7 @@ export function normalizeSubstackUrl(raw: string): string {
   try {
     const url = new URL(raw.trim())
     if (!ALLOWED_PROTOCOLS.has(url.protocol)) {
-      throw new Error('URL must use https://')
+      throw new Error('URL must use http:// or https://')
     }
     if (!url.hostname.endsWith('.substack.com')) {
       throw new Error('URL must be a substack.com publication')
