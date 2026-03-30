@@ -120,9 +120,8 @@ that together form the best EEC. The lessons array must be ordered by sequencePo
   const raw = toolBlock.input as Record<string, unknown>
 
   if (!Array.isArray(raw.lessons)) {
-    throw new Error(
-      `Curation tool returned unexpected shape — "lessons" is ${raw.lessons === undefined ? 'missing' : typeof raw.lessons}. Raw: ${JSON.stringify(raw).slice(0, 300)}`
-    )
+    console.error('[curate] tool call failed. Raw response:', JSON.stringify(raw).slice(0, 300))
+    throw new Error('Curation response was incomplete or invalid. Please try again.')
   }
 
   const lessons = (raw.lessons as CuratedLesson[])

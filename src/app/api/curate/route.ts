@@ -1,30 +1,47 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown } from '@/lib/ai'
-import type { CurateRequest, GeneratedLesson, CurateSSEEvent, LessonCount } from '@/types'
+import type { GeneratedLesson, CurateSSEEvent, LessonCount } from '@/types'
 import { ALLOWED_LESSON_COUNTS } from '@/types'
 
 export const maxDuration = 180
+
+const MAX_BODY_CHARS = 15_000
+
+const CurateRequestSchema = z.object({
+  posts: z.array(z.object({
+    slug: z.string().max(500),
+    title: z.string().max(500),
+    subtitle: z.string().max(500).nullable(),
+    publishedAt: z.string(),
+    wordCount: z.number(),
+    excerpt: z.string().max(500),
+    bodyHtml: z.string(),
+    bodyText: z.string(),
+    audience: z.enum(['everyone', 'paid']),
+  })).min(1).max(50),
+  lessonCount: z.number(),
+})
 
 function sseEvent(data: CurateSSEEvent): string {
   return `data: ${JSON.stringify(data)}\n\n`
 }
 
+function isLessonCount(value: unknown): value is LessonCount {
+  return ALLOWED_LESSON_COUNTS.includes(value as LessonCount)
+}
+
 export async function POST(request: NextRequest): Promise<Response> {
-  const body: CurateRequest = await request.json()
-
-  if (!body.posts || body.posts.length === 0) {
-    return new Response(
-      sseEvent({ type: 'error', message: 'No posts provided' }),
-      { status: 400, headers: { 'Content-Type': 'text/event-stream' } },
-    )
+  const parsed = CurateRequestSchema.safeParse(await request.json())
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
+  const body = parsed.data
 
-  if (body.posts.length > 50) {
-    return new Response(
-      sseEvent({ type: 'error', message: 'Too many posts (max 50)' }),
-      { status: 400, headers: { 'Content-Type': 'text/event-stream' } },
-    )
-  }
+  const posts = body.posts.map(p => ({
+    ...p,
+    bodyText: typeof p.bodyText === 'string' ? p.bodyText.slice(0, MAX_BODY_CHARS) : '',
+  }))
 
   const encoder = new TextEncoder()
 
@@ -35,14 +52,12 @@ export async function POST(request: NextRequest): Promise<Response> {
 
       try {
         // Step 1: Curation
-        const lessonCount: LessonCount = (ALLOWED_LESSON_COUNTS as readonly number[]).includes(body.lessonCount as number)
-          ? body.lessonCount as LessonCount
-          : 5
-        const selection = await curatePostSelection(body.posts, lessonCount)
+        const lessonCount = isLessonCount(body.lessonCount) ? body.lessonCount : 5 as LessonCount
+        const selection = await curatePostSelection(posts, lessonCount)
         enqueue({ type: 'selection', data: selection })
 
         // Step 2: Rewrite each selected lesson in sequence
-        const postsBySlug = new Map(body.posts.map(p => [p.slug, p]))
+        const postsBySlug = new Map(posts.map(p => [p.slug, p]))
         const completedLessons: GeneratedLesson[] = []
         const total = selection.lessons.length
 
@@ -66,7 +81,10 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         enqueue({ type: 'done', lessons: completedLessons })
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
+        console.error('[curate] stream error:', err)
+        const message = err instanceof Error && err.message.startsWith('No suitable posts')
+          ? err.message
+          : 'An error occurred generating your course. Please try again.'
         enqueue({ type: 'error', message })
       } finally {
         controller.close()
