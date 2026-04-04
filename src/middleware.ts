@@ -27,6 +27,7 @@ const LIMITS: Record<string, { limit: number; windowMs: number }> = {
   '/api/curate': { limit: 5, windowMs: 60_000 },
   '/api/fetch-posts': { limit: 20, windowMs: 60_000 },
   '/api/export': { limit: 20, windowMs: 60_000 },
+  '/api/propose-courses': { limit: 3, windowMs: 60_000 },
 }
 
 export function middleware(request: NextRequest) {
@@ -52,5 +53,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/curate', '/api/fetch-posts', '/api/export'],
+  matcher: ['/api/curate', '/api/fetch-posts', '/api/export', '/api/propose-courses'],
 }

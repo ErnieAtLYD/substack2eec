@@ -51,6 +51,11 @@ export type LessonCount = typeof ALLOWED_LESSON_COUNTS[number]
 export interface CurateRequest {
   posts: SubstackPost[]
   lessonCount?: number  // optional; validated server-side, defaults to 5
+  selectedCourse?: CuratedSelection  // if provided, skips AI curation step
+}
+
+export interface ProposeCoursesResponse {
+  candidates: CuratedSelection[]
 }
 
 export interface ExportRequest {

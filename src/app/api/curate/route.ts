@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown } from '@/lib/ai'
-import type { GeneratedLesson, CurateSSEEvent, LessonCount } from '@/types'
+import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown, sanitizeForPrompt } from '@/lib/ai'
+import type { GeneratedLesson, CurateSSEEvent, LessonCount, CuratedSelection } from '@/types'
 import { ALLOWED_LESSON_COUNTS } from '@/types'
 
 export const maxDuration = 180
 
 const MAX_BODY_CHARS = 15_000
+
+const CuratedLessonSchema = z.object({
+  slug: z.string().max(500),
+  sequencePosition: z.number().int().min(1).max(10),
+  lessonFocus: z.string().max(300),
+  selectionRationale: z.string().max(300),
+})
+
+const CuratedSelectionSchema = z.object({
+  courseTitle: z.string().max(60),
+  courseDescription: z.string().max(500),
+  targetAudience: z.string().max(200),
+  overallRationale: z.string().max(500),
+  lessons: z.array(CuratedLessonSchema).min(1).max(10),
+})
 
 const CurateRequestSchema = z.object({
   posts: z.array(z.object({
@@ -21,6 +36,7 @@ const CurateRequestSchema = z.object({
     audience: z.enum(['everyone', 'paid']),
   })).min(1).max(50),
   lessonCount: z.number(),
+  selectedCourse: CuratedSelectionSchema.optional(),
 })
 
 function sseEvent(data: CurateSSEEvent): string {
@@ -51,9 +67,39 @@ export async function POST(request: NextRequest): Promise<Response> {
         controller.enqueue(encoder.encode(sseEvent(event)))
 
       try {
-        // Step 1: Curation
         const lessonCount = isLessonCount(body.lessonCount) ? body.lessonCount : 5 as LessonCount
-        const selection = await curatePostSelection(posts, lessonCount)
+
+        // Step 1: Curation — skip if caller provided a pre-selected course
+        let selection: CuratedSelection
+        if (body.selectedCourse) {
+          // Validate slug cross-reference: all lesson slugs must be in the submitted posts
+          const postsBySlugCheck = new Map(posts.map(p => [p.slug, true]))
+          const unknownSlugs = body.selectedCourse.lessons
+            .map(l => l.slug)
+            .filter(s => !postsBySlugCheck.has(s))
+          if (unknownSlugs.length > 0) {
+            enqueue({ type: 'error', message: 'Selected course references posts not in the submitted list.' })
+            controller.close()
+            return
+          }
+
+          // Sanitize client-supplied string fields before they reach AI prompts
+          const sc = body.selectedCourse
+          selection = {
+            ...sc,
+            courseTitle:       sanitizeForPrompt(sc.courseTitle),
+            courseDescription: sanitizeForPrompt(sc.courseDescription),
+            targetAudience:    sanitizeForPrompt(sc.targetAudience),
+            overallRationale:  sanitizeForPrompt(sc.overallRationale),
+            lessons: sc.lessons.map(l => ({
+              ...l,
+              lessonFocus:        sanitizeForPrompt(l.lessonFocus),
+              selectionRationale: sanitizeForPrompt(l.selectionRationale),
+            })),
+          }
+        } else {
+          selection = await curatePostSelection(posts, lessonCount)
+        }
         enqueue({ type: 'selection', data: selection })
 
         // Step 2: Rewrite each selected lesson in sequence

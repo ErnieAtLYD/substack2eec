@@ -29,7 +29,7 @@ src/
 - All `src/lib/` files must import `server-only` — they contain secrets
 - No `NEXT_PUBLIC_` prefix on env vars — API keys must never reach the client
 - Route Handlers use Node runtime (not Edge) — needed for `setTimeout` rate limiting
-- `export const maxDuration = 180` on `/api/curate`
+- `export const maxDuration = 180` on `/api/curate`; `export const maxDuration = 60` on `/api/propose-courses`
 - Substack fetcher: 1 req/sec, exponential backoff on 429
 - `MAX_POST_WORDS = 2500` in `src/lib/substack.ts` — truncation at extraction time
 
@@ -38,7 +38,7 @@ src/
 
 ## Agent API
 
-Three-step pipeline: fetch → curate (SSE) → export.
+Four-step pipeline (propose is optional): fetch → [propose →] curate (SSE) → export.
 
 ### Step 1 — POST /api/fetch-posts
 
@@ -54,11 +54,31 @@ Three-step pipeline: fetch → curate (SSE) → export.
 
 Constraint: max 50 posts are fetched internally. `skippedCount` reflects paywalled posts skipped.
 
+### Step 1b (optional) — POST /api/propose-courses
+
+```ts
+// Request
+{ posts: SubstackPost[], lessonCount?: number }
+
+// Response 200
+{ candidates: CuratedSelection[] }   // always exactly 3 distinct themes
+
+// Errors: 400 (bad input), 500 (AI failure)
+```
+
+Returns 3 thematically distinct course candidates. Pass the chosen `CuratedSelection`
+as `selectedCourse` to `POST /api/curate` to skip auto-curation and go straight to
+lesson rewriting. `candidateCount` is fixed at 3 and is not a request parameter.
+
 ### Step 2 — POST /api/curate (SSE stream)
 
 ```ts
 // Request
-{ posts: SubstackPost[], lessonCount?: 3 | 5 | 7 | 10 }
+{
+  posts: SubstackPost[],
+  lessonCount?: 3 | 5 | 7 | 10,
+  selectedCourse?: CuratedSelection  // if provided, skips AI curation step
+}
 // lessonCount defaults to 5 if omitted or invalid
 
 // Response: text/event-stream — each line: `data: <JSON>\n\n`

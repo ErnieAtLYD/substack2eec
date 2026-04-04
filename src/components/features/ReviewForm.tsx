@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import type { SubstackPost, GeneratedLesson, CurateSSEEvent } from '@/types'
+import type { SubstackPost, GeneratedLesson, CurateSSEEvent, CuratedSelection } from '@/types'
 
-type Step = 'input' | 'fetching' | 'generating' | 'review' | 'downloading'
+type Step = 'input' | 'fetching' | 'picking' | 'generating' | 'review' | 'downloading'
 
 type LogEntry = { text: string; done: boolean }
 
@@ -77,6 +77,8 @@ export default function ReviewForm() {
   const [url, setUrl] = useState('')
   const [lessons, setLessons] = useState<GeneratedLesson[]>([])
   const [courseMeta, setCourseMeta] = useState<CourseMeta>({ courseTitle: '', courseDescription: '' })
+  const [fetchedPosts, setFetchedPosts] = useState<SubstackPost[]>([])
+  const [candidates, setCandidates] = useState<CuratedSelection[]>([])
   const [streamLog, setStreamLog] = useState<LogEntry[]>([])
   const [slowWarning, setSlowWarning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -138,6 +140,7 @@ export default function ReviewForm() {
         return
       }
       posts = data.posts
+      setFetchedPosts(posts)
       setSkippedCount(data.skippedCount ?? 0)
     } catch {
       setError('Network error while fetching posts. Please try again.')
@@ -145,7 +148,33 @@ export default function ReviewForm() {
       return
     }
 
-    // Step 2: Stream curation + rewriting
+    // Step 2: Propose course candidates for user to pick
+    try {
+      const res = await fetch('/api/propose-courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ posts, lessonCount: 5 }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Failed to generate course candidates')
+        setStep('input')
+        return
+      }
+      setCandidates(data.candidates)
+      setStep('picking')
+    } catch {
+      setError('Network error while generating candidates. Please try again.')
+      setStep('input')
+    }
+  }
+
+  async function handleConfirmCandidate(candidate: CuratedSelection) {
+    setCourseMeta({ courseTitle: candidate.courseTitle, courseDescription: candidate.courseDescription })
+    writeSessionMeta({ courseTitle: candidate.courseTitle, courseDescription: candidate.courseDescription })
+    setStreamLog([])
+    setExpectedLessonCount(candidate.lessons.length)
+    setCompletedLessonCount(0)
     setStep('generating')
     startSlowTimer()
 
@@ -155,12 +184,12 @@ export default function ReviewForm() {
       const res = await fetch('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ posts, lessonCount: 5 }),
+        body: JSON.stringify({ posts: fetchedPosts, lessonCount: 5, selectedCourse: candidate }),
       })
 
       if (!res.ok || !res.body) {
         setError('Failed to start course generation')
-        setStep('input')
+        setStep('picking')
         clearSlowTimer()
         return
       }
@@ -187,10 +216,7 @@ export default function ReviewForm() {
           }
 
           if (event.type === 'selection') {
-            const meta = { courseTitle: event.data.courseTitle, courseDescription: event.data.courseDescription }
-            setCourseMeta(meta)
-            writeSessionMeta(meta)
-            setExpectedLessonCount(event.data.lessons.length)
+            // courseMeta already set from confirmed candidate — selection event is informational only
             setStreamLog(prev => [...prev, { text: `Course: "${event.data.courseTitle}"`, done: false }])
           } else if (event.type === 'lesson_start') {
             setStreamLog(prev => [...prev, { text: `Writing lesson ${event.lessonNumber}…`, done: false }])
@@ -213,7 +239,7 @@ export default function ReviewForm() {
               updateLessons(inProgressLessons)
               setStep('review')
             } else {
-              setStep('input')
+              setStep('picking')
             }
             return
           }
@@ -231,7 +257,7 @@ export default function ReviewForm() {
         setStep('review')
       } else {
         setError('Network error during generation. Please try again.')
-        setStep('input')
+        setStep('picking')
       }
     }
   }
@@ -268,6 +294,8 @@ export default function ReviewForm() {
     clearSessionMeta()
     setLessons([])
     setCourseMeta({ courseTitle: '', courseDescription: '' })
+    setFetchedPosts([])
+    setCandidates([])
     setStreamLog([])
     setError(null)
     setSkippedCount(0)
@@ -295,7 +323,7 @@ export default function ReviewForm() {
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-16">
 
         {/* Page header — not shown during input because the card has its own icon+heading */}
-        {(step === 'fetching' || step === 'generating') && (
+        {(step === 'fetching' || step === 'picking' || step === 'generating') && (
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gray-100 mb-6">
               <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-gray-700">
@@ -393,6 +421,56 @@ export default function ReviewForm() {
         {step === 'fetching' && (
           <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-lg px-8 py-12 text-center">
             <p className="text-sm text-gray-500 animate-pulse">Fetching posts from Substack…</p>
+          </div>
+        )}
+
+        {/* PICKING */}
+        {step === 'picking' && (
+          <div className="w-full max-w-4xl">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose your course theme</h2>
+              <p className="text-gray-500 text-base max-w-md mx-auto">
+                We found 3 different courses you could build from this newsletter. Pick the one that fits your audience.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {candidates.map((candidate, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col"
+                >
+                  <div className="px-5 py-5 flex-1">
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">Option {i + 1}</p>
+                    <h3 className="text-base font-semibold text-gray-900 mb-2 leading-snug">{candidate.courseTitle}</h3>
+                    <p className="text-sm text-gray-500 mb-4 line-clamp-3">{candidate.courseDescription}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600">
+                        {candidate.lessons.length} lessons
+                      </span>
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600 max-w-[160px] truncate">
+                        {candidate.targetAudience}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="px-5 pb-5">
+                    <button
+                      onClick={() => handleConfirmCandidate(candidate)}
+                      className="w-full rounded-lg bg-gray-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+                    >
+                      Choose this course →
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="text-center">
+              <button
+                onClick={handleStartOver}
+                className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                ← Start over
+              </button>
+            </div>
           </div>
         )}
 

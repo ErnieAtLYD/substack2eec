@@ -81,7 +81,7 @@ one coherent topic — delivered one lesson at a time.
 
 // Sanitizes user-controlled strings for plain-text prompt context: collapses whitespace
 // and caps length. For XML block context, also apply xmlEscape after this call.
-function sanitizeForPrompt(s: string): string {
+export function sanitizeForPrompt(s: string): string {
   return s.slice(0, MAX_PROMPT_FIELD_LEN).replace(/[\n\r\t]/g, ' ')
 }
 
@@ -146,6 +146,130 @@ that together form the best EEC. The lessons array must be ordered by sequencePo
     overallRationale: String(raw.overallRationale ?? ''),
     lessons,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Candidate proposal — one call, 3 distinct CuratedSelections
+// ---------------------------------------------------------------------------
+
+function buildProposeCandidatesTool(lessonCount: number): Anthropic.Messages.Tool {
+  const lessonItemSchema = {
+    type: 'object' as const,
+    required: ['slug', 'sequencePosition', 'lessonFocus', 'selectionRationale'],
+    properties: {
+      slug: { type: 'string' },
+      sequencePosition: { type: 'integer', minimum: 1, maximum: lessonCount },
+      lessonFocus: { type: 'string', description: 'The specific angle or insight to emphasize in this lesson' },
+      selectionRationale: { type: 'string', description: 'Why this post was chosen and how it serves the course arc' },
+    },
+  }
+
+  const candidateSchema = {
+    type: 'object' as const,
+    required: ['courseTitle', 'courseDescription', 'targetAudience', 'overallRationale', 'lessons'],
+    properties: {
+      courseTitle: { type: 'string', description: 'Compelling course title, ≤60 chars' },
+      courseDescription: { type: 'string', description: '2–3 sentences: what the reader will learn and why it matters' },
+      targetAudience: { type: 'string', description: 'Who this course is for, 1 sentence' },
+      overallRationale: { type: 'string', description: 'Why these posts together form a coherent course' },
+      lessons: {
+        type: 'array' as const,
+        minItems: 1,
+        maxItems: lessonCount,
+        items: lessonItemSchema,
+      },
+    },
+  }
+
+  return {
+    name: 'propose_course_candidates',
+    description: 'Propose 3 distinctly different Educational Email Course themes from the same newsletter archive.',
+    input_schema: {
+      type: 'object',
+      required: ['candidates'],
+      properties: {
+        candidates: {
+          type: 'array',
+          minItems: 3,
+          maxItems: 3,
+          items: candidateSchema,
+        },
+      },
+    },
+  }
+}
+
+const PROPOSE_SYSTEM = `\
+${CURATION_SYSTEM}
+
+## Additional requirement for this task
+
+You must propose EXACTLY 3 course candidates that are as different from each other as possible:
+- Each candidate must emphasize a distinct theme from the newsletter
+- Each candidate should draw on mostly different posts (minimal overlap between candidates)
+- Together, the 3 candidates should cover the breadth of the newsletter's topics
+- A reader should be able to see at a glance why each candidate is a different kind of course`
+
+export async function proposeCourseCandidates(
+  posts: SubstackPost[],
+  lessonCount: number,
+): Promise<CuratedSelection[]> {
+  const prompt = `\
+Below are ${posts.length} posts from a Substack newsletter archive.
+
+${formatPostsForCuration(posts)}
+
+---
+
+Propose exactly 3 distinctly different course themes. For each, select exactly \
+${lessonCount} posts (or fewer if the archive doesn't have enough suitable posts) \
+ordered by sequencePosition (1 = first email sent).
+
+The 3 candidates must be thematically distinct — different topics, different angles, \
+different audiences if possible. Minimal post overlap between candidates.`
+
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 8192,
+    system: PROPOSE_SYSTEM,
+    tools: [buildProposeCandidatesTool(lessonCount)],
+    tool_choice: { type: 'tool', name: 'propose_course_candidates' },
+    messages: [{ role: 'user', content: prompt }],
+  })
+
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error('Candidate proposal was truncated (max_tokens). Try with fewer posts.')
+  }
+
+  const toolBlock = response.content.find(b => b.type === 'tool_use')
+  if (!toolBlock || toolBlock.type !== 'tool_use') {
+    throw new Error('Claude did not return a tool call for candidate proposal')
+  }
+
+  const raw = toolBlock.input as Record<string, unknown>
+
+  if (!Array.isArray(raw.candidates)) {
+    console.error('[propose] tool call failed. Raw response:', JSON.stringify(raw).slice(0, 300))
+    throw new Error('Candidate proposal response was incomplete or invalid. Please try again.')
+  }
+
+  const candidates = (raw.candidates as Record<string, unknown>[])
+    .filter(c => Array.isArray(c.lessons) && typeof c.courseTitle === 'string')
+    .map(c => ({
+      courseTitle: String(c.courseTitle ?? ''),
+      courseDescription: String(c.courseDescription ?? ''),
+      targetAudience: String(c.targetAudience ?? ''),
+      overallRationale: String(c.overallRationale ?? ''),
+      lessons: (c.lessons as CuratedLesson[])
+        .slice()
+        .sort((a, b) => a.sequencePosition - b.sequencePosition),
+    }))
+
+  if (candidates.length < 3) {
+    throw new Error(`Expected 3 course candidates, got ${candidates.length}. Please try again.`)
+  }
+
+  return candidates
 }
 
 // ---------------------------------------------------------------------------

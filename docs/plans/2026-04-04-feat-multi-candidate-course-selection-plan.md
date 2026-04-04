@@ -1,7 +1,7 @@
 ---
 title: feat: Multi-Candidate Course Selection
 type: feat
-status: active
+status: completed
 date: 2026-04-04
 ---
 
@@ -237,22 +237,22 @@ const [fetchedPosts, setFetchedPosts] = useState<SubstackPost[]>([])
 
 ## Acceptance Criteria
 
-- [ ] `POST /api/propose-courses` returns exactly 3 `CuratedSelection` objects, each with a distinct course title and theme
-- [ ] Candidates use different subsets of posts (no single post appears in all 3)
-- [ ] `proposeCourseCandidates` uses `max_tokens: 8192`, checks `stop_reason`, validates each candidate individually
-- [ ] `POST /api/propose-courses` has `export const maxDuration = 60`
-- [ ] `POST /api/propose-courses` is added to `src/middleware.ts` rate limiter (3 req/min/IP)
-- [ ] `selectedCourse` Zod schema enforces field-length constraints matching `buildCurationTool`
-- [ ] Slug cross-reference check returns 400 if any lesson slug not in submitted posts
-- [ ] `sanitizeForPrompt` applied to all 5 client-supplied string fields of `selectedCourse` before any AI call
-- [ ] UI shows a `'picking'` step with 3 candidate cards after post-fetch completes
-- [ ] Each card displays: title, description, target audience, lesson count
-- [ ] Clicking a card immediately calls `handleConfirmCandidate` (single-click, no separate Generate CTA)
-- [ ] `posts` hoisted to `useState<SubstackPost[]>` so `handleConfirmCandidate` can access it
-- [ ] `/api/curate` without `selectedCourse` still works as before (backward compat)
-- [ ] Back navigation from `'picking'` returns to `'input'`
-- [ ] Error from `/api/propose-courses` shows inline error and returns to `'input'` step
-- [ ] CLAUDE.md updated with Agent API docs for new route and updated curate request shape
+- [x] `POST /api/propose-courses` returns exactly 3 `CuratedSelection` objects, each with a distinct course title and theme
+- [x] Candidates use different subsets of posts (no single post appears in all 3)
+- [x] `proposeCourseCandidates` uses `max_tokens: 8192`, checks `stop_reason`, validates each candidate individually
+- [x] `POST /api/propose-courses` has `export const maxDuration = 60`
+- [x] `POST /api/propose-courses` is added to `src/middleware.ts` rate limiter (3 req/min/IP)
+- [x] `selectedCourse` Zod schema enforces field-length constraints matching `buildCurationTool`
+- [x] Slug cross-reference check returns 400 if any lesson slug not in submitted posts
+- [x] `sanitizeForPrompt` applied to all 5 client-supplied string fields of `selectedCourse` before any AI call
+- [x] UI shows a `'picking'` step with 3 candidate cards after post-fetch completes
+- [x] Each card displays: title, description, target audience, lesson count
+- [x] Clicking a card immediately calls `handleConfirmCandidate` (single-click, no separate Generate CTA)
+- [x] `posts` hoisted to `useState<SubstackPost[]>` so `handleConfirmCandidate` can access it
+- [x] `/api/curate` without `selectedCourse` still works as before (backward compat)
+- [x] Back navigation from `'picking'` returns to `'input'`
+- [x] Error from `/api/propose-courses` shows inline error and returns to `'input'` step
+- [x] CLAUDE.md updated with Agent API docs for new route and updated curate request shape
 
 ## Dependencies & Risks
 
