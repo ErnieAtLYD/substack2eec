@@ -37,7 +37,8 @@ export function middleware(request: NextRequest) {
   if (!config) return NextResponse.next()
 
   const ip =
-    request.ip ??
+    // request.ip is available at runtime on Vercel edge but not typed in Next.js 16
+    (request as NextRequest & { ip?: string }).ip ??
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     'unknown'
   const key = `${ip}:${pathname}`
