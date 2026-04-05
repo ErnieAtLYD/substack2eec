@@ -1,15 +1,18 @@
 # CLAUDE.md — substack2eec
 
 ## Dev server
+
 ```bash
 npm run dev   # http://localhost:3000
 ```
 
 ## Environment variables
+
 - `ANTHROPIC_API_KEY` — required, set in `.env.local` (never commit)
 - See `.env.example` for the full list
 
 ## Directory conventions
+
 ```
 src/
 ├── app/
@@ -26,19 +29,24 @@ src/
 ```
 
 ## Key rules
+
 - All `src/lib/` files must import `server-only` — they contain secrets
 - No `NEXT_PUBLIC_` prefix on env vars — API keys must never reach the client
 - Route Handlers use Node runtime (not Edge) — needed for `setTimeout` rate limiting
-- `export const maxDuration = 180` on `/api/curate`
+- `export const maxDuration = 180` on `/api/curate`; `export const maxDuration = 60` on `/api/propose-courses`
 - Substack fetcher: 1 req/sec, exponential backoff on 429
 - `MAX_POST_WORDS = 2500` in `src/lib/substack.ts` — truncation at extraction time
+- When I report a bug, don't start by trying to fix it. Instead, start by writing a test that reproduces the bug. Then, have subagents try to fix the bug and prove it with a passing test.
+
+
 
 ## Spike code
+
 - `spike/extract.ts` — standalone extraction tester: `npx tsx spike/extract.ts <url> [limit]`
 
 ## Agent API
 
-Three-step pipeline: fetch → curate (SSE) → export.
+Four-step pipeline (propose is optional): fetch → [propose →] curate (SSE) → export.
 
 ### Step 1 — POST /api/fetch-posts
 
@@ -54,11 +62,33 @@ Three-step pipeline: fetch → curate (SSE) → export.
 
 Constraint: max 50 posts are fetched internally. `skippedCount` reflects paywalled posts skipped.
 
+### Step 1b (optional) — POST /api/propose-courses
+
+```ts
+// Request
+{ posts: SubstackPost[], lessonCount?: number }
+
+// Response 200
+{ candidates: CuratedSelection[] }   // always exactly 3 distinct themes
+
+// Errors: 400 (bad input, or lessonCount not in [3, 5, 7, 10]), 500 (AI failure)
+```
+
+`lessonCount` must be one of `[3, 5, 7, 10]`; invalid values return 400.
+
+Returns 3 thematically distinct course candidates. Pass the chosen `CuratedSelection`
+as `selectedCourse` to `POST /api/curate` to skip auto-curation and go straight to
+lesson rewriting. `candidateCount` is fixed at 3 and is not a request parameter.
+
 ### Step 2 — POST /api/curate (SSE stream)
 
 ```ts
 // Request
-{ posts: SubstackPost[], lessonCount?: 3 | 5 | 7 | 10 }
+{
+  posts: SubstackPost[],
+  lessonCount?: 3 | 5 | 7 | 10,
+  selectedCourse?: CuratedSelection  // if provided, skips AI curation step
+}
 // lessonCount defaults to 5 if omitted or invalid
 
 // Response: text/event-stream — each line: `data: <JSON>\n\n`
@@ -66,14 +96,16 @@ Constraint: max 50 posts are fetched internally. `skippedCount` reflects paywall
 
 SSE event sequence:
 
-| Event type | Shape | Notes |
-|---|---|---|
-| `selection` | `{ type: 'selection', data: CuratedSelection }` | Emitted once; contains courseTitle, courseDescription, targetAudience, ordered lesson plan |
-| `lesson_start` | `{ type: 'lesson_start', lessonNumber: number }` | Emitted before each lesson rewrite begins |
-| `lesson_chunk` | `{ type: 'lesson_chunk', lessonNumber: number, text: string }` | Streaming markdown chunk for in-progress lesson |
-| `lesson_done` | `{ type: 'lesson_done', lesson: GeneratedLesson }` | Emitted when a lesson is fully written; collect these |
-| `done` | `{ type: 'done', lessons: GeneratedLesson[] }` | Final event; `lessons` is the full ordered array |
-| `error` | `{ type: 'error', message: string }` | Fatal error; stream closes |
+
+| Event type     | Shape                                                          | Notes                                                                                      |
+| -------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `selection`    | `{ type: 'selection', data: CuratedSelection }`                | Emitted once; contains courseTitle, courseDescription, targetAudience, ordered lesson plan |
+| `lesson_start` | `{ type: 'lesson_start', lessonNumber: number }`               | Emitted before each lesson rewrite begins                                                  |
+| `lesson_chunk` | `{ type: 'lesson_chunk', lessonNumber: number, text: string }` | Streaming markdown chunk for in-progress lesson                                            |
+| `lesson_done`  | `{ type: 'lesson_done', lesson: GeneratedLesson }`             | Emitted when a lesson is fully written; collect these                                      |
+| `done`         | `{ type: 'done', lessons: GeneratedLesson[] }`                 | Final event; `lessons` is the full ordered array                                           |
+| `error`        | `{ type: 'error', message: string }`                           | Fatal error; stream closes                                                                 |
+
 
 Parse SSE:
 
@@ -88,6 +120,8 @@ for await (const line of response.body) {
 ```
 
 Constraints: max 50 posts; `lessonCount` must be one of `[3, 5, 7, 10]`; `maxDuration = 180s`.
+
+Note: when `selectedCourse` is provided, `lessonCount` is ignored — the lesson plan is determined entirely by `selectedCourse.lessons`.
 
 Note: `lessonCount` values 3, 7, 10 are agent-only — the UI only exposes 5.
 
@@ -122,3 +156,4 @@ lesson.keyTakeaway     // key takeaway text
 ```
 
 `courseTitle` and `courseDescription` can come from the `selection` event's `CuratedSelection.courseTitle` / `.courseDescription`, or be overridden.
+
