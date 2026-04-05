@@ -555,7 +555,7 @@ export default function ReviewForm() {
                   value={lesson.markdownBody}
                   onChange={e => handleLessonEdit(i, e.target.value)}
                   rows={20}
-                  className="w-full px-4 py-3 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400 resize-y"
+                  className="w-full px-4 py-3 font-mono text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400 resize-y"
                 />
               </div>
             ))}
