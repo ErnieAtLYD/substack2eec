@@ -30,13 +30,13 @@ src/
 
 ## Key rules
 
+- IMPORTANT: When I report a bug, don't start by trying to fix it. Instead, start by writing a test that reproduces the bug. Then, have subagents try to fix the bug and prove it with a passing test.
 - All `src/lib/` files must import `server-only` — they contain secrets
 - No `NEXT_PUBLIC_` prefix on env vars — API keys must never reach the client
 - Route Handlers use Node runtime (not Edge) — needed for `setTimeout` rate limiting
 - `export const maxDuration = 180` on `/api/curate`; `export const maxDuration = 60` on `/api/propose-courses`
 - Substack fetcher: 1 req/sec, exponential backoff on 429
 - `MAX_POST_WORDS = 2500` in `src/lib/substack.ts` — truncation at extraction time
-- When I report a bug, don't start by trying to fix it. Instead, start by writing a test that reproduces the bug. Then, have subagents try to fix the bug and prove it with a passing test.
 
 
 
