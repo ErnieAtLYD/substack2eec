@@ -37,8 +37,8 @@ export function middleware(request: NextRequest) {
   if (!config) return NextResponse.next()
 
   const ip =
+    request.ip ??
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    request.headers.get('x-real-ip') ??
     'unknown'
   const key = `${ip}:${pathname}`
 

@@ -85,7 +85,7 @@ export function sanitizeForPrompt(s: string): string {
   return s.slice(0, MAX_PROMPT_FIELD_LEN).replace(/[\n\r\t]/g, ' ')
 }
 
-function formatPostsForCuration(posts: SubstackPost[]): string {
+function formatPostsForCuration(posts: Pick<SubstackPost, 'slug' | 'title' | 'subtitle' | 'publishedAt' | 'wordCount' | 'excerpt'>[]): string {
   return posts.map((p, i) =>
     [
       `[${i + 1}] slug: ${p.slug}`,
@@ -113,7 +113,7 @@ that together form the best EEC. The lessons array must be ordered by sequencePo
   const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 4096,
-    system: CURATION_SYSTEM,
+    system: [{ type: 'text' as const, text: CURATION_SYSTEM, cache_control: { type: 'ephemeral' } as any }],
     tools: [buildCurationTool(lessonCount)],
     tool_choice: { type: 'tool', name: 'select_course_posts' },
     messages: [{ role: 'user', content: prompt }],
@@ -135,8 +135,13 @@ that together form the best EEC. The lessons array must be ordered by sequencePo
     throw new Error('Curation response was incomplete or invalid. Please try again.')
   }
 
-  const lessons = (raw.lessons as CuratedLesson[])
-    .slice()
+  const lessons = (raw.lessons as unknown[])
+    .filter((l): l is CuratedLesson =>
+      typeof l === 'object' && l !== null &&
+      typeof (l as Record<string, unknown>).sequencePosition === 'number' &&
+      !Number.isNaN((l as Record<string, unknown>).sequencePosition) &&
+      typeof (l as Record<string, unknown>).slug === 'string'
+    )
     .sort((a, b) => a.sequencePosition - b.sequencePosition)
 
   return {
@@ -153,34 +158,6 @@ that together form the best EEC. The lessons array must be ordered by sequencePo
 // ---------------------------------------------------------------------------
 
 function buildProposeCandidatesTool(lessonCount: number): Anthropic.Messages.Tool {
-  const lessonItemSchema = {
-    type: 'object' as const,
-    required: ['slug', 'sequencePosition', 'lessonFocus', 'selectionRationale'],
-    properties: {
-      slug: { type: 'string' },
-      sequencePosition: { type: 'integer', minimum: 1, maximum: lessonCount },
-      lessonFocus: { type: 'string', description: 'The specific angle or insight to emphasize in this lesson' },
-      selectionRationale: { type: 'string', description: 'Why this post was chosen and how it serves the course arc' },
-    },
-  }
-
-  const candidateSchema = {
-    type: 'object' as const,
-    required: ['courseTitle', 'courseDescription', 'targetAudience', 'overallRationale', 'lessons'],
-    properties: {
-      courseTitle: { type: 'string', description: 'Compelling course title, ≤60 chars' },
-      courseDescription: { type: 'string', description: '2–3 sentences: what the reader will learn and why it matters' },
-      targetAudience: { type: 'string', description: 'Who this course is for, 1 sentence' },
-      overallRationale: { type: 'string', description: 'Why these posts together form a coherent course' },
-      lessons: {
-        type: 'array' as const,
-        minItems: 1,
-        maxItems: lessonCount,
-        items: lessonItemSchema,
-      },
-    },
-  }
-
   return {
     name: 'propose_course_candidates',
     description: 'Propose 3 distinctly different Educational Email Course themes from the same newsletter archive.',
@@ -192,13 +169,39 @@ function buildProposeCandidatesTool(lessonCount: number): Anthropic.Messages.Too
           type: 'array',
           minItems: 3,
           maxItems: 3,
-          items: candidateSchema,
+          items: {
+            type: 'object' as const,
+            required: ['courseTitle', 'courseDescription', 'targetAudience', 'overallRationale', 'lessons'],
+            properties: {
+              courseTitle: { type: 'string', description: 'Compelling course title, ≤60 chars' },
+              courseDescription: { type: 'string', description: '2–3 sentences: what the reader will learn and why it matters' },
+              targetAudience: { type: 'string', description: 'Who this course is for, 1 sentence' },
+              overallRationale: { type: 'string', description: 'Why these posts together form a coherent course' },
+              lessons: {
+                type: 'array' as const,
+                minItems: 1,
+                maxItems: lessonCount,
+                items: {
+                  type: 'object' as const,
+                  required: ['slug', 'sequencePosition', 'lessonFocus', 'selectionRationale'],
+                  properties: {
+                    slug: { type: 'string' },
+                    sequencePosition: { type: 'integer', minimum: 1, maximum: lessonCount },
+                    lessonFocus: { type: 'string', description: 'The specific angle or insight to emphasize in this lesson' },
+                    selectionRationale: { type: 'string', description: 'Why this post was chosen and how it serves the course arc' },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     },
   }
 }
 
+// Note: PROPOSE_SYSTEM extends CURATION_SYSTEM via interpolation.
+// Edits to CURATION_SYSTEM will affect both curation and candidate proposal.
 const PROPOSE_SYSTEM = `\
 ${CURATION_SYSTEM}
 
@@ -211,7 +214,7 @@ You must propose EXACTLY 3 course candidates that are as different from each oth
 - A reader should be able to see at a glance why each candidate is a different kind of course`
 
 export async function proposeCourseCandidates(
-  posts: SubstackPost[],
+  posts: Pick<SubstackPost, 'slug' | 'title' | 'subtitle' | 'publishedAt' | 'wordCount' | 'excerpt' | 'audience'>[],
   lessonCount: number,
 ): Promise<CuratedSelection[]> {
   const prompt = `\
@@ -230,8 +233,8 @@ different audiences if possible. Minimal post overlap between candidates.`
 
   const response = await getClient().messages.create({
     model: MODEL,
-    max_tokens: 8192,
-    system: PROPOSE_SYSTEM,
+    max_tokens: 4096,
+    system: [{ type: 'text' as const, text: PROPOSE_SYSTEM, cache_control: { type: 'ephemeral' } as any }],
     tools: [buildProposeCandidatesTool(lessonCount)],
     tool_choice: { type: 'tool', name: 'propose_course_candidates' },
     messages: [{ role: 'user', content: prompt }],
@@ -260,8 +263,13 @@ different audiences if possible. Minimal post overlap between candidates.`
       courseDescription: String(c.courseDescription ?? ''),
       targetAudience: String(c.targetAudience ?? ''),
       overallRationale: String(c.overallRationale ?? ''),
-      lessons: (c.lessons as CuratedLesson[])
-        .slice()
+      lessons: (c.lessons as unknown[])
+        .filter((l): l is CuratedLesson =>
+          typeof l === 'object' && l !== null &&
+          typeof (l as Record<string, unknown>).sequencePosition === 'number' &&
+          !Number.isNaN((l as Record<string, unknown>).sequencePosition) &&
+          typeof (l as Record<string, unknown>).slug === 'string'
+        )
         .sort((a, b) => a.sequencePosition - b.sequencePosition),
     }))
 
@@ -387,6 +395,8 @@ Write Lesson ${lessonNum} of ${total} now. Start directly with "## Lesson ${less
           {
             type: 'text',
             text: courseContextText,
+            // Note: ephemeral cache TTL is 5 min. If the user spends >5 min on the
+            // picking step before confirming, this cache will miss on the first lesson rewrite.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             cache_control: { type: 'ephemeral' } as any,
           },

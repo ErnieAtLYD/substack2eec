@@ -2,49 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown, sanitizeForPrompt } from '@/lib/ai'
 import type { GeneratedLesson, CurateSSEEvent, LessonCount, CuratedSelection } from '@/types'
-import { ALLOWED_LESSON_COUNTS } from '@/types'
+import { MAX_BODY_CHARS, CuratedSelectionSchema, SubstackPostSchema, isLessonCount } from '@/types'
 
 export const maxDuration = 180
 
-const MAX_BODY_CHARS = 15_000
-
-const CuratedLessonSchema = z.object({
-  slug: z.string().max(500),
-  sequencePosition: z.number().int().min(1).max(10),
-  lessonFocus: z.string().max(300),
-  selectionRationale: z.string().max(300),
-})
-
-const CuratedSelectionSchema = z.object({
-  courseTitle: z.string().max(60),
-  courseDescription: z.string().max(500),
-  targetAudience: z.string().max(200),
-  overallRationale: z.string().max(500),
-  lessons: z.array(CuratedLessonSchema).min(1).max(10),
-})
-
 const CurateRequestSchema = z.object({
-  posts: z.array(z.object({
-    slug: z.string().max(500),
-    title: z.string().max(500),
-    subtitle: z.string().max(500).nullable(),
-    publishedAt: z.string(),
-    wordCount: z.number(),
-    excerpt: z.string().max(500),
-    bodyHtml: z.string(),
-    bodyText: z.string(),
-    audience: z.enum(['everyone', 'paid']),
-  })).min(1).max(50),
+  posts: z.array(SubstackPostSchema).min(1).max(50),
   lessonCount: z.number(),
   selectedCourse: CuratedSelectionSchema.optional(),
 })
 
 function sseEvent(data: CurateSSEEvent): string {
   return `data: ${JSON.stringify(data)}\n\n`
-}
-
-function isLessonCount(value: unknown): value is LessonCount {
-  return (ALLOWED_LESSON_COUNTS as ReadonlyArray<unknown>).includes(value)
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -59,6 +28,20 @@ export async function POST(request: NextRequest): Promise<Response> {
     bodyText: typeof p.bodyText === 'string' ? p.bodyText.slice(0, MAX_BODY_CHARS) : '',
   }))
 
+  // Validate selectedCourse slug cross-reference before opening the stream
+  if (body.selectedCourse) {
+    const postSlugs = new Set(posts.map(p => p.slug))
+    const unknownSlugs = body.selectedCourse.lessons
+      .map(l => l.slug)
+      .filter(s => !postSlugs.has(s))
+    if (unknownSlugs.length > 0) {
+      return NextResponse.json(
+        { error: 'Selected course references posts not in the submitted list.' },
+        { status: 400 }
+      )
+    }
+  }
+
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -72,18 +55,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         // Step 1: Curation — skip if caller provided a pre-selected course
         let selection: CuratedSelection
         if (body.selectedCourse) {
-          // Validate slug cross-reference: all lesson slugs must be in the submitted posts
-          const postsBySlugCheck = new Map(posts.map(p => [p.slug, true]))
-          const unknownSlugs = body.selectedCourse.lessons
-            .map(l => l.slug)
-            .filter(s => !postsBySlugCheck.has(s))
-          if (unknownSlugs.length > 0) {
-            enqueue({ type: 'error', message: 'Selected course references posts not in the submitted list.' })
-            controller.close()
-            return
-          }
-
-          // Sanitize client-supplied string fields before they reach AI prompts
+          // selectedCourse already validated above — just sanitize
           const sc = body.selectedCourse
           selection = {
             ...sc,

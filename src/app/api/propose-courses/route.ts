@@ -1,31 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { proposeCourseCandidates } from '@/lib/ai'
-import { ALLOWED_LESSON_COUNTS } from '@/types'
-import type { LessonCount } from '@/types'
+import type { LessonCount, ProposeCoursesResponse } from '@/types'
 
 export const maxDuration = 60
 
-const MAX_BODY_CHARS = 15_000
-
 const ProposeRequestSchema = z.object({
   posts: z.array(z.object({
-    slug: z.string().max(500),
+    slug: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).max(100),
     title: z.string().max(500),
     subtitle: z.string().max(500).nullable(),
-    publishedAt: z.string(),
-    wordCount: z.number(),
+    publishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
+    wordCount: z.number().int().min(0).max(100_000),
     excerpt: z.string().max(500),
-    bodyHtml: z.string(),
-    bodyText: z.string(),
     audience: z.enum(['everyone', 'paid']),
   })).min(1).max(50),
-  lessonCount: z.number().optional(),
+  lessonCount: z.union([z.literal(3), z.literal(5), z.literal(7), z.literal(10)]).optional(),
 })
-
-function isLessonCount(value: unknown): value is LessonCount {
-  return (ALLOWED_LESSON_COUNTS as ReadonlyArray<unknown>).includes(value)
-}
 
 export async function POST(request: NextRequest): Promise<Response> {
   const parsed = ProposeRequestSchema.safeParse(await request.json())
@@ -34,19 +25,16 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
   const body = parsed.data
 
-  const posts = body.posts.map(p => ({
-    ...p,
-    bodyText: typeof p.bodyText === 'string' ? p.bodyText.slice(0, MAX_BODY_CHARS) : '',
-  }))
-
-  const lessonCount = isLessonCount(body.lessonCount) ? body.lessonCount : 5 as LessonCount
+  const lessonCount: LessonCount = body.lessonCount ?? 5
 
   try {
-    const candidates = await proposeCourseCandidates(posts, lessonCount)
-    return NextResponse.json({ candidates })
+    const candidates = await proposeCourseCandidates(body.posts, lessonCount)
+    return NextResponse.json<ProposeCoursesResponse>({ candidates })
   } catch (err) {
     console.error('[propose-courses] error:', err)
-    const message = err instanceof Error ? err.message : 'An error occurred proposing course candidates.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    const userMessage = err instanceof Error && err.message.startsWith('Candidate proposal')
+      ? err.message
+      : 'Failed to generate course candidates. Please try again.'
+    return NextResponse.json({ error: userMessage }, { status: 500 })
   }
 }

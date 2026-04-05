@@ -153,7 +153,10 @@ export default function ReviewForm() {
       const res = await fetch('/api/propose-courses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ posts, lessonCount: 5 }),
+        body: JSON.stringify({
+          posts: posts.map(({ bodyText: _bt, bodyHtml: _bh, ...meta }) => meta),
+          lessonCount: 5,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -169,7 +172,7 @@ export default function ReviewForm() {
     }
   }
 
-  async function handleConfirmCandidate(candidate: CuratedSelection) {
+  async function handleConfirmCandidate(candidate: CuratedSelection, posts: SubstackPost[]) {
     setCourseMeta({ courseTitle: candidate.courseTitle, courseDescription: candidate.courseDescription })
     writeSessionMeta({ courseTitle: candidate.courseTitle, courseDescription: candidate.courseDescription })
     setStreamLog([])
@@ -184,7 +187,7 @@ export default function ReviewForm() {
       const res = await fetch('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ posts: fetchedPosts, lessonCount: 5, selectedCourse: candidate }),
+        body: JSON.stringify({ posts, lessonCount: candidate.lessons.length, selectedCourse: candidate }),
       })
 
       if (!res.ok || !res.body) {
@@ -436,7 +439,7 @@ export default function ReviewForm() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               {candidates.map((candidate, i) => (
                 <div
-                  key={i}
+                  key={candidate.courseTitle}
                   className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col"
                 >
                   <div className="px-5 py-5 flex-1">
@@ -454,7 +457,7 @@ export default function ReviewForm() {
                   </div>
                   <div className="px-5 pb-5">
                     <button
-                      onClick={() => handleConfirmCandidate(candidate)}
+                      onClick={() => handleConfirmCandidate(candidate, fetchedPosts)}
                       className="w-full rounded-lg bg-gray-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
                     >
                       Choose this course →
