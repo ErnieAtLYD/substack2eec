@@ -27,6 +27,7 @@ const LIMITS: Record<string, { limit: number; windowMs: number }> = {
   '/api/curate': { limit: 5, windowMs: 60_000 },
   '/api/fetch-posts': { limit: 20, windowMs: 60_000 },
   '/api/export': { limit: 20, windowMs: 60_000 },
+  '/api/propose-courses': { limit: 3, windowMs: 60_000 },
 }
 
 export function middleware(request: NextRequest) {
@@ -36,8 +37,9 @@ export function middleware(request: NextRequest) {
   if (!config) return NextResponse.next()
 
   const ip =
+    // request.ip is available at runtime on Vercel edge but not typed in Next.js 16
+    (request as NextRequest & { ip?: string }).ip ??
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    request.headers.get('x-real-ip') ??
     'unknown'
   const key = `${ip}:${pathname}`
 
@@ -52,5 +54,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/curate', '/api/fetch-posts', '/api/export'],
+  matcher: ['/api/curate', '/api/fetch-posts', '/api/export', '/api/propose-courses'],
 }

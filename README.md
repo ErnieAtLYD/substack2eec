@@ -29,9 +29,11 @@ npm run dev        # http://localhost:3000
 
 ## Env vars
 
-| Variable | Required | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | yes | Anthropic API key |
+
+| Variable            | Required | Description       |
+| ------------------- | -------- | ----------------- |
+| `ANTHROPIC_API_KEY` | yes      | Anthropic API key |
+
 
 Never use `NEXT_PUBLIC_` — API keys must not reach the client.
 
@@ -41,3 +43,4 @@ Never use `NEXT_PUBLIC_` — API keys must not reach the client.
 - `/api/curate` streams SSE; `maxDuration = 180` for Vercel
 - Posts are truncated to 2500 words at extraction time (`MAX_POST_WORDS`)
 - Spike tester: `npx tsx spike/extract.ts <url> [limit]`
+

@@ -1,34 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown } from '@/lib/ai'
-import type { GeneratedLesson, CurateSSEEvent, LessonCount } from '@/types'
-import { ALLOWED_LESSON_COUNTS } from '@/types'
+import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown, sanitizeForPrompt } from '@/lib/ai'
+import type { GeneratedLesson, CurateSSEEvent, LessonCount, CuratedSelection } from '@/types'
+import { MAX_BODY_CHARS, CuratedSelectionSchema, SubstackPostSchema, isLessonCount } from '@/types'
 
 export const maxDuration = 180
 
-const MAX_BODY_CHARS = 15_000
-
 const CurateRequestSchema = z.object({
-  posts: z.array(z.object({
-    slug: z.string().max(500),
-    title: z.string().max(500),
-    subtitle: z.string().max(500).nullable(),
-    publishedAt: z.string(),
-    wordCount: z.number(),
-    excerpt: z.string().max(500),
-    bodyHtml: z.string(),
-    bodyText: z.string(),
-    audience: z.enum(['everyone', 'paid']),
-  })).min(1).max(50),
+  posts: z.array(SubstackPostSchema).min(1).max(50),
   lessonCount: z.number(),
+  selectedCourse: CuratedSelectionSchema.optional(),
 })
 
 function sseEvent(data: CurateSSEEvent): string {
   return `data: ${JSON.stringify(data)}\n\n`
-}
-
-function isLessonCount(value: unknown): value is LessonCount {
-  return ALLOWED_LESSON_COUNTS.includes(value as LessonCount)
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -43,6 +28,20 @@ export async function POST(request: NextRequest): Promise<Response> {
     bodyText: typeof p.bodyText === 'string' ? p.bodyText.slice(0, MAX_BODY_CHARS) : '',
   }))
 
+  // Validate selectedCourse slug cross-reference before opening the stream
+  if (body.selectedCourse) {
+    const postSlugs = new Set(posts.map(p => p.slug))
+    const unknownSlugs = body.selectedCourse.lessons
+      .map(l => l.slug)
+      .filter(s => !postSlugs.has(s))
+    if (unknownSlugs.length > 0) {
+      return NextResponse.json(
+        { error: 'Selected course references posts not in the submitted list.' },
+        { status: 400 }
+      )
+    }
+  }
+
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -51,9 +50,28 @@ export async function POST(request: NextRequest): Promise<Response> {
         controller.enqueue(encoder.encode(sseEvent(event)))
 
       try {
-        // Step 1: Curation
         const lessonCount = isLessonCount(body.lessonCount) ? body.lessonCount : 5 as LessonCount
-        const selection = await curatePostSelection(posts, lessonCount)
+
+        // Step 1: Curation — skip if caller provided a pre-selected course
+        let selection: CuratedSelection
+        if (body.selectedCourse) {
+          // selectedCourse already validated above — just sanitize
+          const sc = body.selectedCourse
+          selection = {
+            ...sc,
+            courseTitle:       sanitizeForPrompt(sc.courseTitle),
+            courseDescription: sanitizeForPrompt(sc.courseDescription),
+            targetAudience:    sanitizeForPrompt(sc.targetAudience),
+            overallRationale:  sanitizeForPrompt(sc.overallRationale),
+            lessons: sc.lessons.map(l => ({
+              ...l,
+              lessonFocus:        sanitizeForPrompt(l.lessonFocus),
+              selectionRationale: sanitizeForPrompt(l.selectionRationale),
+            })),
+          }
+        } else {
+          selection = await curatePostSelection(posts, lessonCount)
+        }
         enqueue({ type: 'selection', data: selection })
 
         // Step 2: Rewrite each selected lesson in sequence

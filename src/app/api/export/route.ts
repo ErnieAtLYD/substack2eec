@@ -1,23 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { buildZip } from '@/lib/export'
-import type { ExportRequest } from '@/types'
+
+const ExportRequestSchema = z.object({
+  lessons: z.array(z.object({
+    lessonNumber: z.number(),
+    title: z.string().max(500),
+    subjectLine: z.string().max(50),
+    previewText: z.string().max(90),
+    markdownBody: z.string().max(50_000),
+    keyTakeaway: z.string().max(500),
+    filename: z.string().regex(/^[a-z0-9][a-z0-9-]*\.md$/).max(80),
+  })).min(1).max(50),
+  courseTitle: z.string().max(200),
+  courseDescription: z.string().max(1000),
+})
 
 export async function POST(request: NextRequest): Promise<Response> {
-  const body: ExportRequest = await request.json()
-
-  if (!body.lessons || body.lessons.length === 0) {
-    return NextResponse.json({ error: 'No lessons provided' }, { status: 400 })
+  const parsed = ExportRequestSchema.safeParse(await request.json())
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
+  const body = parsed.data
 
-  const courseTitle = body.courseTitle ?? 'Email Course'
-  const courseDescription = body.courseDescription ?? ''
+  const courseTitle = body.courseTitle || 'Email Course'
+  const courseDescription = body.courseDescription
 
   let zipBuffer: ArrayBuffer
   try {
     zipBuffer = await buildZip(body.lessons, courseTitle, courseDescription)
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to build ZIP'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[export] buildZip error:', err)
+    return NextResponse.json({ error: 'Failed to build ZIP' }, { status: 500 })
   }
 
   const safeTitle = courseTitle
