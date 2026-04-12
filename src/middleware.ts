@@ -37,9 +37,10 @@ export function middleware(request: NextRequest) {
   if (!config) return NextResponse.next()
 
   const ip =
-    // request.ip is available at runtime on Vercel edge but not typed in Next.js 16
+    // request.ip is injected by Vercel's edge and is non-spoofable
     (request as NextRequest & { ip?: string }).ip ??
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    // x-vercel-forwarded-for is set by Vercel at ingress and cannot be spoofed by clients
+    request.headers.get('x-vercel-forwarded-for') ??
     'unknown'
   const key = `${ip}:${pathname}`
 
