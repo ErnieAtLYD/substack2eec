@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { proposeCourseCandidates } from '@/lib/ai'
+import { SubstackPostSchema } from '@/types'
 import type { LessonCount, ProposeCoursesResponse } from '@/types'
 
 export const maxDuration = 60
 
 const ProposeRequestSchema = z.object({
-  posts: z.array(z.object({
-    slug: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).max(100),
-    title: z.string().max(500),
-    subtitle: z.string().max(500).nullable(),
-    publishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
-    wordCount: z.number().int().min(0).max(100_000),
-    excerpt: z.string().max(500),
-    audience: z.enum(['everyone', 'paid']),
+  posts: z.array(SubstackPostSchema.pick({
+    slug: true,
+    title: true,
+    subtitle: true,
+    publishedAt: true,
+    wordCount: true,
+    excerpt: true,
+    audience: true,
   })).min(1).max(50),
   lessonCount: z.union([z.literal(3), z.literal(5), z.literal(7), z.literal(10)]).optional(),
 })

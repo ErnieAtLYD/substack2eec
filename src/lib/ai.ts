@@ -233,7 +233,7 @@ different audiences if possible. Minimal post overlap between candidates.`
 
   const response = await getClient().messages.create({
     model: MODEL,
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: [{ type: 'text' as const, text: PROPOSE_SYSTEM, cache_control: { type: 'ephemeral' } as any }],
     tools: [buildProposeCandidatesTool(lessonCount)],
     tool_choice: { type: 'tool', name: 'propose_course_candidates' },
