@@ -56,7 +56,7 @@ function writeSessionLessons(lessons: GeneratedLesson[]) {
     if (err instanceof DOMException && err.name === 'QuotaExceededError') {
       console.warn('[substack2eec] sessionStorage quota exceeded — lesson progress will not be saved on refresh')
     }
-    // Silently ignore other errors (SSR environment, private mode, etc.)
+    // Silently ignore other errors (SSR environment, private browsing, etc.)
   }
 }
 
@@ -71,6 +71,15 @@ const EXAMPLES = [
   { label: 'Astral Codex Ten', url: 'https://astralcodexten.substack.com' },
   { label: 'Not Boring',       url: 'https://notboring.substack.com' },
 ] as const
+
+// Spark icon used in the generate button
+function SparkIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={className}>
+      <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.897l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684Z" />
+    </svg>
+  )
+}
 
 export default function ReviewForm() {
   const [step, setStep] = useState<Step>('input')
@@ -88,7 +97,6 @@ export default function ReviewForm() {
 
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // On mount: restore from sessionStorage if available
   useEffect(() => {
     const saved = readSessionLessons()
     const meta = readSessionMeta()
@@ -125,7 +133,6 @@ export default function ReviewForm() {
     setCompletedLessonCount(0)
     setStep('fetching')
 
-    // Step 1: Fetch posts
     let posts: SubstackPost[]
     try {
       const res = await fetch('/api/fetch-posts', {
@@ -148,7 +155,6 @@ export default function ReviewForm() {
       return
     }
 
-    // Step 2: Propose course candidates for user to pick
     try {
       const res = await fetch('/api/propose-courses', {
         method: 'POST',
@@ -218,14 +224,13 @@ export default function ReviewForm() {
             continue
           }
 
+          // courseMeta already set from confirmed candidate — selection event is informational only
           if (event.type === 'selection') {
-            // courseMeta already set from confirmed candidate — selection event is informational only
             setStreamLog(prev => [...prev, { text: `Course: "${event.data.courseTitle}"`, done: false }])
           } else if (event.type === 'lesson_start') {
             setStreamLog(prev => [...prev, { text: `Writing lesson ${event.lessonNumber}…`, done: false }])
           } else if (event.type === 'lesson_done') {
             inProgressLessons.push(event.lesson)
-            // Append to sessionStorage as each lesson arrives
             writeSessionLessons([...inProgressLessons])
             setCompletedLessonCount(inProgressLessons.length)
             setStreamLog(prev => [...prev, { text: `Lesson ${event.lesson.lessonNumber}: ${event.lesson.title}`, done: true }])
@@ -322,117 +327,131 @@ export default function ReviewForm() {
   // -------------------------------------------------------------------------
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-[#0d1b2a]"
+      style={{
+        backgroundImage: `
+          radial-gradient(at 15% 20%, rgba(0,200,180,0.12) 0px, transparent 55%),
+          radial-gradient(at 85% 75%, rgba(30,80,140,0.25) 0px, transparent 50%)
+        `
+      }}
+    >
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-16">
 
-        {/* Page header — not shown during input because the card has its own icon+heading */}
+        {/* Page header — fetching / picking / generating states */}
         {(step === 'fetching' || step === 'picking' || step === 'generating') && (
           <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gray-100 mb-6">
-              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-gray-700">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-[#00c8a8]/20 mb-6">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-[#00c8a8]">
                 <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
                 <path d="M6 12v5c3 3 9 3 12 0v-5" />
               </svg>
             </div>
-            <h1 className="text-4xl font-bold tracking-tight text-gray-900 mb-3">Substack to Email Course</h1>
-            <p className="text-gray-500 text-lg max-w-md mx-auto">
+            <h1 className="text-4xl font-light tracking-tight text-[#ddeee8] mb-3">Substack to Email Course</h1>
+            <p className="text-[#8ab8a8] text-lg max-w-md mx-auto">
               Transform your Substack newsletter into engaging educational email courses.
               Get 2–3 unique course variations with lessons, takeaways, and action items.
             </p>
           </div>
         )}
 
+        {/* Error banner */}
         {error && (
-          <div className="w-full max-w-2xl mb-6 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <div className="w-full max-w-2xl mb-6 rounded-lg bg-red-950/50 border border-red-700/40 px-4 py-3 text-sm text-red-300">
             {error}
           </div>
         )}
 
-        {/* INPUT */}
+        {/* ── INPUT ── */}
         {step === 'input' && (
-          <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-lg px-8 pt-8 pb-8">
-            {/* Card icon + heading */}
-            <div className="flex flex-col items-center text-center mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gray-100 mb-5">
-                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 text-gray-700">
-                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                  <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Transform Your Substack</h2>
-              <p className="text-gray-500 text-base max-w-sm">
-                Enter your Substack URL and we will create 2–3 educational email course variations from your content
-              </p>
+          <div className="w-full max-w-2xl">
+            {/* Eyebrow */}
+            <div className="flex items-center gap-3 mb-4">
+              <span className="block w-6 h-px bg-[#00c8a8] opacity-70" />
+              <span className="font-mono text-[11px] font-medium tracking-[0.18em] uppercase text-[#00c8a8]">
+                Educational Email Courses
+              </span>
             </div>
 
-            {/* URL input + button */}
-            <form onSubmit={handleGenerate}>
-              <div className="flex gap-3 mb-5">
-                <input
-                  type="url"
-                  value={url}
-                  onChange={e => setUrl(e.target.value)}
-                  placeholder="https://yourname.substack.com"
-                  required
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-                />
-                <button
-                  type="submit"
-                  disabled={!url || step !== 'input'}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gray-500 hover:bg-gray-600 px-5 py-3 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                    <path d="M15.98 1.804a1 1 0 0 0-1.96 0l-.24 1.192a1 1 0 0 1-.784.785l-1.192.238a1 1 0 0 0 0 1.962l1.192.238a1 1 0 0 1 .785.785l.238 1.192a1 1 0 0 0 1.962 0l.238-1.192a1 1 0 0 1 .785-.785l1.192-.238a1 1 0 0 0 0-1.962l-1.192-.238a1 1 0 0 1-.785-.785l-.238-1.192ZM6.949 5.684a1 1 0 0 0-1.898 0l-.683 2.051a1 1 0 0 1-.633.633l-2.051.683a1 1 0 0 0 0 1.898l2.051.684a1 1 0 0 1 .633.632l.683 2.051a1 1 0 0 0 1.898 0l.683-2.051a1 1 0 0 1 .633-.633l2.051-.683a1 1 0 0 0 0-1.897l-2.051-.683a1 1 0 0 1-.633-.633L6.95 5.684Z" />
-                  </svg>
-                  Generate Courses
-                  <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                    <path fillRule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
+            {/* Headline */}
+            <h1 className="text-4xl sm:text-5xl font-light leading-tight tracking-tight text-[#ddeee8] mb-3">
+              Transform your{' '}
+              <em className="not-italic font-semibold text-[#5ee8c8]">Substack</em>{' '}
+              archive
+            </h1>
+            <p className="text-[#8ab8a8] text-base mb-8 max-w-sm leading-relaxed">
+              Paste any Substack URL and get 2–3 ready-to-send email course variations built from your best content.
+            </p>
 
-              {/* Examples */}
-              <div className="text-center mb-6">
-                <p className="text-sm text-gray-500 mb-3">Try an example:</p>
-                <div className="flex flex-wrap justify-center gap-2">
+            {/* Form card */}
+            <div className="rounded-2xl border border-[#00c8a8]/18 bg-white/[0.04] p-6">
+              <form onSubmit={handleGenerate}>
+                {/* URL row */}
+                <div className="flex gap-3 mb-5">
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={e => setUrl(e.target.value)}
+                    placeholder="https://yourname.substack.com"
+                    required
+                    className="flex-1 min-w-0 rounded-lg border border-[#00c8a8]/22 bg-[#08121c]/80 px-4 py-3 font-mono text-sm text-[#9dcfc4] placeholder-[#8ab8a8]/80 focus:outline-none focus:ring-2 focus:ring-[#00c8a8]/40 focus:border-[#00c8a8]/60"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!url || step !== 'input'}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#00c8a8] px-5 py-3 text-sm font-semibold text-[#052118] transition-colors hover:bg-[#0fe0bc] disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <SparkIcon className="w-4 h-4" />
+                    Generate
+                  </button>
+                </div>
+
+                {/* Examples */}
+                <p className="font-mono text-[10.5px] font-medium tracking-[0.14em] uppercase text-[#5a8f80] mb-2">
+                  Try an example
+                </p>
+                <div className="flex flex-wrap gap-2 mb-5">
                   {EXAMPLES.map(ex => (
                     <button
                       key={ex.label}
                       type="button"
                       onClick={() => setUrl(ex.url)}
-                      className="rounded-full border border-gray-300 px-4 py-1.5 text-sm text-gray-700 hover:border-gray-400 hover:bg-gray-50 transition-colors"
+                      className="rounded-full border border-[#00c8a8]/22 bg-[#00c8a8]/7 px-4 py-1.5 text-sm text-[#4ec9b0] transition-colors hover:bg-[#00c8a8]/15 hover:text-[#9eeedd]"
                     >
                       {ex.label}
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* Feature badges */}
-              <div className="flex items-center justify-center gap-2 text-xs text-gray-400 flex-wrap">
-                <span>3–5 emails per course</span>
-                <span>·</span>
-                <span>Key takeaways included</span>
-                <span>·</span>
-                <span>Action items for readers</span>
-              </div>
-            </form>
+                {/* Divider */}
+                <div className="h-px bg-[#00c8a8]/10 mb-4" />
+
+                {/* Feature tags */}
+                <div className="flex flex-wrap gap-5">
+                  {['3–5 emails per course', 'Key takeaways', 'Action items'].map(tag => (
+                    <span key={tag} className="flex items-center gap-1.5 font-mono text-[11px] text-[#5a8f80]">
+                      <span className="inline-block w-1 h-1 rounded-full bg-[#00c8a8] opacity-60" />
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
-        {/* FETCHING */}
+        {/* ── FETCHING ── */}
         {step === 'fetching' && (
-          <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-lg px-8 py-12 text-center">
-            <p className="text-sm text-gray-500 animate-pulse">Fetching posts from Substack…</p>
+          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/[0.04] px-8 py-12 text-center">
+            <p className="font-mono text-sm text-[#4ec9b0] animate-pulse">Fetching posts from Substack…</p>
           </div>
         )}
 
-        {/* PICKING */}
+        {/* ── PICKING ── */}
         {step === 'picking' && (
           <div className="w-full max-w-4xl">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose your course theme</h2>
-              <p className="text-gray-500 text-base max-w-md mx-auto">
+              <h2 className="text-2xl font-light text-[#ddeee8] mb-2">Choose your course theme</h2>
+              <p className="text-[#8ab8a8] text-base max-w-md mx-auto">
                 We found 3 different courses you could build from this newsletter. Pick the one that fits your audience.
               </p>
             </div>
@@ -440,25 +459,27 @@ export default function ReviewForm() {
               {candidates.map((candidate, i) => (
                 <div
                   key={candidate.courseTitle}
-                  className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden flex flex-col"
+                  className="rounded-xl border border-[#00c8a8]/15 bg-white/[0.04] overflow-hidden flex flex-col"
                 >
                   <div className="px-5 py-5 flex-1">
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-2">Option {i + 1}</p>
-                    <h3 className="text-base font-semibold text-gray-900 mb-2 leading-snug">{candidate.courseTitle}</h3>
-                    <p className="text-sm text-gray-500 mb-4 line-clamp-3">{candidate.courseDescription}</p>
+                    <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-[#5a8f80] mb-2">
+                      Option {i + 1}
+                    </p>
+                    <h3 className="text-base font-medium text-[#ddeee8] mb-2 leading-snug">{candidate.courseTitle}</h3>
+                    <p className="text-sm text-[#8ab8a8] mb-4 line-clamp-3">{candidate.courseDescription}</p>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600">
+                      <span className="inline-flex items-center rounded-full bg-[#00c8a8]/10 border border-[#00c8a8]/20 px-2.5 py-0.5 font-mono text-xs text-[#4ec9b0]">
                         {candidate.lessons.length} lessons
                       </span>
-                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600 max-w-[160px] truncate">
-                        {candidate.targetAudience}
+                      <span className="inline-flex items-center rounded-full bg-[#00c8a8]/10 border border-[#00c8a8]/20 px-2.5 py-0.5 font-mono text-xs text-[#4ec9b0] max-w-[160px] overflow-hidden">
+                        <span className="truncate min-w-0">{candidate.targetAudience}</span>
                       </span>
                     </div>
                   </div>
                   <div className="px-5 pb-5">
                     <button
                       onClick={() => handleConfirmCandidate(candidate, fetchedPosts)}
-                      className="w-full rounded-lg bg-gray-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+                      className="w-full rounded-lg bg-[#00c8a8] px-4 py-2.5 text-sm font-semibold text-[#052118] hover:bg-[#0fe0bc] transition-colors"
                     >
                       Choose this course →
                     </button>
@@ -469,7 +490,7 @@ export default function ReviewForm() {
             <div className="text-center">
               <button
                 onClick={handleStartOver}
-                className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                className="font-mono text-sm text-[#5a8f80] hover:text-[#4ec9b0] transition-colors"
               >
                 ← Start over
               </button>
@@ -477,85 +498,84 @@ export default function ReviewForm() {
           </div>
         )}
 
-        {/* GENERATING */}
+        {/* ── GENERATING ── */}
         {step === 'generating' && (
-          <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-lg px-8 py-10 space-y-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/[0.04] px-8 py-10 space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-700 animate-pulse">Generating your course…</p>
+              <p className="font-mono text-sm text-[#4ec9b0] animate-pulse">Generating your course…</p>
               {completedLessonCount > 0 && (
-                <span className="text-sm font-semibold tabular-nums text-gray-600">
+                <span className="font-mono text-sm tabular-nums text-[#8ab8a8]">
                   {completedLessonCount} / {expectedLessonCount} lessons
                 </span>
               )}
             </div>
             {completedLessonCount > 0 && (
-              <div className="h-1.5 w-full rounded-full bg-gray-100">
+              <div className="h-1.5 w-full rounded-full bg-white/10">
                 <div
-                  className="h-1.5 rounded-full bg-gray-500 transition-all duration-500"
+                  className="h-1.5 rounded-full bg-[#00c8a8] transition-all duration-500"
                   style={{ width: `${(completedLessonCount / expectedLessonCount) * 100}%` }}
                 />
               </div>
             )}
             {slowWarning && (
-              <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
+              <div className="rounded-lg bg-amber-950/50 border border-amber-700/40 px-4 py-3 text-sm text-amber-300">
                 This is taking longer than usual — still working…
               </div>
             )}
             <ul className="space-y-1.5 text-sm">
               {streamLog.map((entry, i) => (
-                // stable enough — entries are append-only
-                <li key={i} className={['flex items-start gap-2', entry.done ? 'text-gray-700' : 'text-gray-400'].join(' ')}>
+                <li key={i} className={['flex items-start gap-2', entry.done ? 'text-[#9dcfc4]' : 'text-[#5a8f80]'].join(' ')}>
                   {entry.done
-                    ? <span className="mt-0.5 text-green-500 shrink-0">✓</span>
-                    : <span className="mt-0.5 shrink-0 text-gray-300">·</span>
+                    ? <span className="mt-0.5 text-[#00c8a8] shrink-0">✓</span>
+                    : <span className="mt-0.5 shrink-0 text-[#5a8f80]">·</span>
                   }
-                  <span>{entry.text}</span>
+                  <span className="font-mono">{entry.text}</span>
                 </li>
               ))}
             </ul>
           </div>
         )}
 
-        {/* REVIEW */}
+        {/* ── REVIEW ── */}
         {step === 'review' && (
           <div className="w-full max-w-3xl space-y-8">
             {courseMeta.courseTitle && (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-0.5">Course</p>
-                <p className="text-base font-semibold text-gray-900">{courseMeta.courseTitle}</p>
+              <div className="rounded-lg border border-[#00c8a8]/15 bg-white/[0.04] px-4 py-3">
+                <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-[#5a8f80] mb-0.5">Course</p>
+                <p className="text-base font-medium text-[#ddeee8]">{courseMeta.courseTitle}</p>
                 {courseMeta.courseDescription && (
-                  <p className="mt-1 text-sm text-gray-600">{courseMeta.courseDescription}</p>
+                  <p className="mt-1 text-sm text-[#8ab8a8]">{courseMeta.courseDescription}</p>
                 )}
               </div>
             )}
             {skippedCount > 0 && (
-              <p className="text-sm text-gray-500">
+              <p className="font-mono text-sm text-[#5a8f80]">
                 {skippedCount} paywalled post{skippedCount !== 1 ? 's' : ''} were skipped.
               </p>
             )}
             {lessons.length < expectedLessonCount && (
-              <p className="text-sm text-amber-600">
+              <p className="font-mono text-sm text-amber-400/80">
                 Only {lessons.length} suitable public post{lessons.length !== 1 ? 's' : ''} found — course is shorter than expected.
               </p>
             )}
 
             {lessons.map((lesson, i) => (
-              <div key={lesson.lessonNumber} className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-700 text-xs font-bold text-white">
+              <div key={lesson.lessonNumber} className="rounded-xl border border-[#00c8a8]/15 bg-white/[0.04] overflow-hidden">
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-[#00c8a8]/10 bg-white/[0.03]">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00c8a8] font-mono text-xs font-bold text-[#052118]">
                     {lesson.lessonNumber}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium text-gray-800" title={lesson.title}>{lesson.title}</p>
-                    <p className="truncate text-xs text-gray-400 mt-0.5">Subject: {lesson.subjectLine}</p>
+                    <p className="truncate text-sm font-medium text-[#ddeee8]" title={lesson.title}>{lesson.title}</p>
+                    <p className="truncate font-mono text-xs text-[#5a8f80] mt-0.5">Subject: {lesson.subjectLine}</p>
                   </div>
-                  <span className="shrink-0 font-mono text-xs text-gray-300 hidden sm:block">{lesson.filename}</span>
+                  <span className="shrink-0 font-mono text-xs text-[#5a8f80] hidden sm:block">{lesson.filename}</span>
                 </div>
                 <textarea
                   value={lesson.markdownBody}
                   onChange={e => handleLessonEdit(i, e.target.value)}
                   rows={20}
-                  className="w-full px-4 py-3 font-mono text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-gray-400 resize-y"
+                  className="w-full px-4 py-3 font-mono text-xs text-[#9dcfc4] bg-transparent focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#00c8a8]/30 resize-y"
                 />
               </div>
             ))}
@@ -563,13 +583,13 @@ export default function ReviewForm() {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleDownload}
-                className="rounded-lg bg-gray-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
+                className="rounded-lg bg-[#00c8a8] px-5 py-2.5 text-sm font-semibold text-[#052118] hover:bg-[#0fe0bc] transition-colors"
               >
                 Download ZIP
               </button>
               <button
                 onClick={handleStartOver}
-                className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-lg border border-[#00c8a8]/22 px-5 py-2.5 text-sm font-medium text-[#4ec9b0] hover:bg-[#00c8a8]/10 transition-colors"
               >
                 Start Over
               </button>
@@ -577,18 +597,18 @@ export default function ReviewForm() {
           </div>
         )}
 
-        {/* DOWNLOADING */}
+        {/* ── DOWNLOADING ── */}
         {step === 'downloading' && (
-          <div className="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-lg px-8 py-12 text-center">
-            <p className="text-sm text-gray-500 animate-pulse">Preparing your ZIP…</p>
+          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/[0.04] px-8 py-12 text-center">
+            <p className="font-mono text-sm text-[#4ec9b0] animate-pulse">Preparing your ZIP…</p>
           </div>
         )}
 
       </div>
 
       {/* Footer */}
-      <footer className="py-6 text-center text-sm text-gray-400">
-        Powered by AI. Enter any Substack URL to get started.
+      <footer className="py-6 text-center font-mono text-xs text-[#5a8f80] tracking-wide">
+        Powered by AI · Enter any Substack URL to get started
       </footer>
     </div>
   )
