@@ -327,14 +327,7 @@ export default function ReviewForm() {
   // -------------------------------------------------------------------------
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0d1b2a]"
-      style={{
-        backgroundImage: `
-          radial-gradient(at 15% 20%, rgba(0,200,180,0.12) 0px, transparent 55%),
-          radial-gradient(at 85% 75%, rgba(30,80,140,0.25) 0px, transparent 50%)
-        `
-      }}
-    >
+    <div className="flex flex-col min-h-screen bg-background page-gradient">
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-16">
 
         {/* Page header — fetching / picking / generating states */}
@@ -383,7 +376,7 @@ export default function ReviewForm() {
             </p>
 
             {/* Form card */}
-            <div className="rounded-2xl border border-[#00c8a8]/18 bg-white/[0.04] p-6">
+            <div className="rounded-2xl border border-[#00c8a8]/20 bg-white/5 p-6">
               <form onSubmit={handleGenerate}>
                 {/* URL row */}
                 <div className="flex gap-3 mb-5">
@@ -393,7 +386,7 @@ export default function ReviewForm() {
                     onChange={e => setUrl(e.target.value)}
                     placeholder="https://yourname.substack.com"
                     required
-                    className="flex-1 min-w-0 rounded-lg border border-[#00c8a8]/22 bg-[#08121c]/80 px-4 py-3 font-mono text-sm text-[#9dcfc4] placeholder-[#8ab8a8]/80 focus:outline-none focus:ring-2 focus:ring-[#00c8a8]/40 focus:border-[#00c8a8]/60"
+                    className="flex-1 min-w-0 rounded-lg border border-[#00c8a8]/20 bg-[#08121c]/80 px-4 py-3 font-mono text-sm text-[#9dcfc4] placeholder-[#8ab8a8]/80 focus:outline-none focus:ring-2 focus:ring-[#00c8a8]/40 focus:border-[#00c8a8]/60"
                   />
                   <button
                     type="submit"
@@ -415,7 +408,7 @@ export default function ReviewForm() {
                       key={ex.label}
                       type="button"
                       onClick={() => setUrl(ex.url)}
-                      className="rounded-full border border-[#00c8a8]/22 bg-[#00c8a8]/7 px-4 py-1.5 text-sm text-[#4ec9b0] transition-colors hover:bg-[#00c8a8]/15 hover:text-[#9eeedd]"
+                      className="rounded-full border border-[#00c8a8]/20 bg-[#00c8a8]/10 px-4 py-1.5 text-sm text-[#4ec9b0] transition-colors hover:bg-[#00c8a8]/15 hover:text-[#9eeedd]"
                     >
                       {ex.label}
                     </button>
@@ -441,7 +434,7 @@ export default function ReviewForm() {
 
         {/* ── FETCHING ── */}
         {step === 'fetching' && (
-          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/[0.04] px-8 py-12 text-center">
+          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/5 px-8 py-12 text-center">
             <p className="font-mono text-sm text-[#4ec9b0] animate-pulse">Fetching posts from Substack…</p>
           </div>
         )}
@@ -459,7 +452,7 @@ export default function ReviewForm() {
               {candidates.map((candidate, i) => (
                 <div
                   key={candidate.courseTitle}
-                  className="rounded-xl border border-[#00c8a8]/15 bg-white/[0.04] overflow-hidden flex flex-col"
+                  className="rounded-xl border border-[#00c8a8]/15 bg-white/5 overflow-hidden flex flex-col"
                 >
                   <div className="px-5 py-5 flex-1">
                     <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-[#5a8f80] mb-2">
@@ -500,7 +493,7 @@ export default function ReviewForm() {
 
         {/* ── GENERATING ── */}
         {step === 'generating' && (
-          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/[0.04] px-8 py-10 space-y-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/5 px-8 py-10 space-y-4">
             <div className="flex items-center justify-between">
               <p className="font-mono text-sm text-[#4ec9b0] animate-pulse">Generating your course…</p>
               {completedLessonCount > 0 && (
@@ -540,7 +533,7 @@ export default function ReviewForm() {
         {step === 'review' && (
           <div className="w-full max-w-3xl space-y-8">
             {courseMeta.courseTitle && (
-              <div className="rounded-lg border border-[#00c8a8]/15 bg-white/[0.04] px-4 py-3">
+              <div className="rounded-lg border border-[#00c8a8]/15 bg-white/5 px-4 py-3">
                 <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-[#5a8f80] mb-0.5">Course</p>
                 <p className="text-base font-medium text-[#ddeee8]">{courseMeta.courseTitle}</p>
                 {courseMeta.courseDescription && (
@@ -560,7 +553,7 @@ export default function ReviewForm() {
             )}
 
             {lessons.map((lesson, i) => (
-              <div key={lesson.lessonNumber} className="rounded-xl border border-[#00c8a8]/15 bg-white/[0.04] overflow-hidden">
+              <div key={lesson.lessonNumber} className="rounded-xl border border-[#00c8a8]/15 bg-white/5 overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3 border-b border-[#00c8a8]/10 bg-white/[0.03]">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00c8a8] font-mono text-xs font-bold text-[#052118]">
                     {lesson.lessonNumber}
@@ -589,7 +582,7 @@ export default function ReviewForm() {
               </button>
               <button
                 onClick={handleStartOver}
-                className="rounded-lg border border-[#00c8a8]/22 px-5 py-2.5 text-sm font-medium text-[#4ec9b0] hover:bg-[#00c8a8]/10 transition-colors"
+                className="rounded-lg border border-[#00c8a8]/20 px-5 py-2.5 text-sm font-medium text-[#4ec9b0] hover:bg-[#00c8a8]/10 transition-colors"
               >
                 Start Over
               </button>
@@ -599,7 +592,7 @@ export default function ReviewForm() {
 
         {/* ── DOWNLOADING ── */}
         {step === 'downloading' && (
-          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/[0.04] px-8 py-12 text-center">
+          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/5 px-8 py-12 text-center">
             <p className="font-mono text-sm text-[#4ec9b0] animate-pulse">Preparing your ZIP…</p>
           </div>
         )}
