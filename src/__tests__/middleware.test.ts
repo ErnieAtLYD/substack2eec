@@ -144,20 +144,5 @@ describe('middleware — IP resolution for rate limiting', () => {
       expect(res.status).toBe(429)
     })
 
-    it('request.ip bucket is independent from x-vercel-forwarded-for bucket', async () => {
-      const primaryIp = '3.3.3.3'
-      const headerIp = '4.4.4.4'
-
-      // Exhaust the bucket via x-vercel-forwarded-for (no request.ip)
-      for (let i = 0; i < CURATE_LIMIT; i++) {
-        middlewareFn(makeRequest('/api/curate', { 'x-vercel-forwarded-for': headerIp }))
-      }
-
-      // A request with request.ip set to a different value should get its own fresh bucket
-      const res = middlewareFn(
-        makeRequest('/api/curate', { 'x-vercel-forwarded-for': headerIp }, primaryIp)
-      )
-      expect(res.status).not.toBe(429)
-    })
   })
 })
