@@ -3,14 +3,10 @@ title: Rate-limit bypass via spoofable X-Forwarded-For header in middleware
 problem_type: security_issue
 component: middleware
 tags:
+  - security
   - rate-limiting
   - ip-spoofing
-  - header-spoofing
   - vercel
-  - security
-  - anthropic-api-cost
-  - x-forwarded-for
-  - x-vercel-forwarded-for
 symptoms:
   - Rate limiter keyed on client-controlled X-Forwarded-For header
   - Callers can rotate XFF header on every request to get a fresh rate-limit bucket
@@ -18,7 +14,7 @@ symptoms:
   - Unbounded upstream API spend amplification
 affected_files:
   - src/middleware.ts
-pr: https://github.com/ErnieAtLYD/substack2eec/pull/6
+pr: https://github.com/ErnieAtLYD/substack2eec/pull/7
 date: 2026-04-12
 ---
 
@@ -71,24 +67,18 @@ Replace the spoofable leftmost-XFF fallback with `x-vercel-forwarded-for`:
 const ip =
   // request.ip is injected by Vercel's edge and is non-spoofable
   (request as NextRequest & { ip?: string }).ip ??
-  // x-vercel-forwarded-for is set by Vercel at ingress and cannot be spoofed by clients
-  request.headers.get('x-vercel-forwarded-for') ??
+  // x-vercel-forwarded-for is set by Vercel at ingress and cannot be spoofed by clients;
+  // split defensively in case Vercel ever emits a comma-separated list in forwarding scenarios
+  request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() ??
+  // TODO: todos/099 — 'unknown' is a shared bucket; consider rejecting instead of silently accepting
   'unknown'
 ```
 
 **Key decisions:**
 
-- **No `.split(',')[0]` on `x-vercel-forwarded-for`:** Vercel sets this as a single IP — splitting is redundant.
+- **Defensive `.split(',')[0]?.trim()` on `x-vercel-forwarded-for`:** In practice Vercel sets a single IP value here, but the split costs nothing and keeps the code resilient if that assumption ever changes in forwarding scenarios.
 - **No rightmost-XFF fallback (YAGNI):** This app is Vercel-only. In non-Vercel environments, XFF at any position is untrustworthy without knowing the proxy chain depth.
 - **`x-real-ip` excluded:** Vercel does not set this header — it would always be null.
-
-## Investigation Steps
-
-1. Audited `src/middleware.ts` — found `x-forwarded-for.split(',')[0]` as the IP key fallback.
-2. Confirmed the attack: any client that sets `X-Forwarded-For: <rotating-value>` opens a fresh bucket per request.
-3. Verified Vercel header behavior: `request.ip` and `x-vercel-forwarded-for` are both non-spoofable; `x-vercel-forwarded-for` is a single IP (Vercel overwrites any client-supplied value at ingress).
-4. Wrote failing regression tests **before** changing the source code (project rule).
-5. Applied the one-line fix; all 5 tests passed.
 
 ## Tests (`src/__tests__/middleware.test.ts`)
 
@@ -122,7 +112,7 @@ it('rotating X-Forwarded-For does NOT open a new bucket when x-vercel-forwarded-
 beforeEach(async () => {
   vi.resetModules()
   const mod = await import('../middleware')
-  middlewareFn = mod.middleware as (req: NextRequest) => Response
+  middlewareFn = mod.middleware as (req: NextRequest) => NextResponse
 })
 ```
 
@@ -135,13 +125,10 @@ beforeEach(async () => {
 **Safe pattern for Vercel:**
 
 ```typescript
-function getClientIp(request: NextRequest): string {
-  return (
-    request.ip ??
-    request.headers.get('x-vercel-forwarded-for') ??
-    'unknown'
-  )
-}
+const ip =
+  (request as NextRequest & { ip?: string }).ip ??
+  request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() ??
+  'unknown'
 ```
 
 Do not fall back to `X-Forwarded-For` in this chain. If neither trusted source is available, the origin is unverifiable — consider rejecting rather than silently accepting under `'unknown'` (the `unknown` bucket is itself a shared DoS vector; see `todos/099`).
@@ -150,13 +137,17 @@ Do not fall back to `X-Forwarded-For` in this chain. If neither trusted source i
 
 ```typescript
 // UNSAFE — leftmost entry is client-controlled
-const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
 
 // UNSAFE — same problem, different form
 const ip = req.headers['x-forwarded-for']?.split(',').shift()
 
 // UNSAFE — X-Real-IP is not set by Vercel and is spoofable on other platforms
 const ip = request.headers.get('x-real-ip')
+
+// UNSAFE — full XFF value used as key; under proxy chaining every unique multi-IP
+//           string becomes its own bucket, effectively disabling the rate limit
+const ip = request.headers.get('x-forwarded-for')
 ```
 
 ### Review Checklist
@@ -167,31 +158,10 @@ const ip = request.headers.get('x-real-ip')
 - [ ] Test suite includes a spoofing test: rotates `X-Forwarded-For` while holding the trusted IP constant and asserts the rate limit is not bypassed
 - [ ] A comment at the IP-extraction call site documents which platform the trusted-header assumption relies on
 
-### Test Pattern: Proving Non-Spoofability
-
-```typescript
-it('rotating x-forwarded-for does NOT produce a new rate-limit bucket', async () => {
-  const limit = 5
-  for (let i = 0; i < limit; i++) {
-    const res = await handler(makeRequest({
-      'x-vercel-forwarded-for': '1.2.3.4',
-      'x-forwarded-for': `${i}.0.0.${i}`, // different each time
-    }))
-    expect(res.status).toBe(200)
-  }
-  // fresh x-forwarded-for value must NOT bypass the limit
-  const res = await handler(makeRequest({
-    'x-vercel-forwarded-for': '1.2.3.4',
-    'x-forwarded-for': '99.99.99.99',
-  }))
-  expect(res.status).toBe(429)
-})
-```
-
 ## Related Documentation
 
 - **Plan:** `docs/plans/2026-04-12-fix-middleware-xff-ip-spoofing-plan.md` — documents the decision rationale (no rightmost-XFF, no `x-real-ip`)
-- **PR:** [ErnieAtLYD/substack2eec#6](https://github.com/ErnieAtLYD/substack2eec/pull/6)
+- **PR:** [ErnieAtLYD/substack2eec#7](https://github.com/ErnieAtLYD/substack2eec/pull/7)
 - **Todos closed:** `todos/046-complete-p2-middleware-xff-ip-spoofing.md`, `todos/084-complete-p2-rate-limit-ip-spoofing-bypassable.md`
 - **Open related:** `todos/050` (unbounded Map growth), `todos/099` (`unknown` shared bucket DoS risk)
 - **Earlier rate-limit work:** [ErnieAtLYD/substack2eec#3](https://github.com/ErnieAtLYD/substack2eec/pull/3) — initial rate limiting via `todos/014`
