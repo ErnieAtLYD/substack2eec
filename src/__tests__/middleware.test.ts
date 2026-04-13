@@ -7,9 +7,16 @@ import { NextRequest } from 'next/server'
 
 function makeRequest(
   pathname: string,
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
+  ip?: string
 ): NextRequest {
-  return new NextRequest(`http://localhost${pathname}`, { headers })
+  const req = new NextRequest(`http://localhost${pathname}`, { headers })
+  // NextRequest does not expose `.ip` as a constructor option; set it via defineProperty
+  // to simulate Vercel's edge-injected IP in tests.
+  if (ip !== undefined) {
+    Object.defineProperty(req, 'ip', { value: ip, configurable: true })
+  }
+  return req
 }
 
 // The rate-limit for /api/curate is 5 requests per minute.
@@ -110,5 +117,32 @@ describe('middleware — IP resolution for rate limiting', () => {
       const res = middlewareFn(makeRequest('/api/curate', { 'x-vercel-forwarded-for': '2.2.2.2' }))
       expect(res.status).not.toBe(429)
     })
+  })
+
+  // -------------------------------------------------------------------------
+  // request.ip precedence: proves request.ip takes priority over x-vercel-forwarded-for
+  // -------------------------------------------------------------------------
+  describe('request.ip precedence', () => {
+    it('keys on request.ip when present, ignoring x-vercel-forwarded-for', async () => {
+      const primaryIp = '7.7.7.7'
+      const headerIp = '8.8.8.8' // different — would open a fresh bucket if used as key
+
+      // Exhaust the bucket using request.ip; x-vercel-forwarded-for differs each time
+      for (let i = 0; i < CURATE_LIMIT; i++) {
+        const req = makeRequest(
+          '/api/curate',
+          { 'x-vercel-forwarded-for': `${i}.${i}.${i}.${i}` },
+          primaryIp
+        )
+        expect(middlewareFn(req).status, `request ${i + 1} should not be rate-limited`).not.toBe(429)
+      }
+
+      // 6th request: same request.ip, fresh x-vercel-forwarded-for — must still be blocked
+      const res = middlewareFn(
+        makeRequest('/api/curate', { 'x-vercel-forwarded-for': headerIp }, primaryIp)
+      )
+      expect(res.status).toBe(429)
+    })
+
   })
 })

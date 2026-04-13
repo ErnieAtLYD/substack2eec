@@ -39,8 +39,10 @@ export function middleware(request: NextRequest) {
   const ip =
     // request.ip is injected by Vercel's edge and is non-spoofable
     (request as NextRequest & { ip?: string }).ip ??
-    // x-vercel-forwarded-for is set by Vercel at ingress and cannot be spoofed by clients
-    request.headers.get('x-vercel-forwarded-for') ??
+    // x-vercel-forwarded-for is set by Vercel at ingress and cannot be spoofed by clients;
+    // split defensively in case Vercel ever emits a comma-separated list in forwarding scenarios
+    request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() ??
+    // TODO: todos/099 — 'unknown' is a shared bucket; consider rejecting instead of silently accepting
     'unknown'
   const key = `${ip}:${pathname}`
 
