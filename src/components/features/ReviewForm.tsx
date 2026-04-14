@@ -97,6 +97,7 @@ export default function ReviewForm() {
 
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // On mount: restore from sessionStorage if available
   useEffect(() => {
     const saved = readSessionLessons()
     const meta = readSessionMeta()
@@ -517,6 +518,7 @@ export default function ReviewForm() {
             )}
             <ul className="space-y-1.5 text-sm">
               {streamLog.map((entry, i) => (
+                // stable enough — entries are append-only
                 <li key={i} className={['flex items-start gap-2', entry.done ? 'text-[#9dcfc4]' : 'text-[#5a8f80]'].join(' ')}>
                   {entry.done
                     ? <span className="mt-0.5 text-[#00c8a8] shrink-0">✓</span>
