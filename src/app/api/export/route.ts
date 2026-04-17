@@ -10,9 +10,9 @@ const ExportRequestSchema = z.object({
     previewText: z.string().max(90),
     markdownBody: z.string().max(50_000),
     keyTakeaway: z.string().max(500),
-    filename: z.string().regex(/^[a-z0-9][a-z0-9-]*\.md$/).max(80),
+    filename: z.string().regex(/^[a-z0-9][a-z0-9-]+\.md$/).max(80),
   })).min(1).max(50),
-  courseTitle: z.string().max(200),
+  courseTitle: z.string().max(200).default('Email Course').transform(v => v || 'Email Course'),
   courseDescription: z.string().max(1000),
 })
 
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
   const body = parsed.data
 
-  const courseTitle = body.courseTitle || 'Email Course'
+  const courseTitle = body.courseTitle
   const courseDescription = body.courseDescription
 
   let zipBuffer: ArrayBuffer
@@ -34,11 +34,11 @@ export async function POST(request: NextRequest): Promise<Response> {
     return NextResponse.json({ error: 'Failed to build ZIP' }, { status: 500 })
   }
 
-  const safeTitle = courseTitle
+  const safeTitle = (courseTitle
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-    .slice(0, 50)
+    .slice(0, 50)) || 'email-course'
 
   return new Response(zipBuffer, {
     headers: {
