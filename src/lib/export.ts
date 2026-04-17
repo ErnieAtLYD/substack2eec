@@ -1,4 +1,5 @@
 import 'server-only'
+import path from 'path'
 import JSZip from 'jszip'
 import type { GeneratedLesson } from '@/types'
 
@@ -38,7 +39,9 @@ export async function buildZip(
   zip.file('README.md', buildReadme(courseTitle, courseDescription, lessons))
 
   for (const lesson of lessons) {
-    zip.file(lesson.filename, lesson.markdownBody)
+    const safeName = path.basename(lesson.filename)
+    if (safeName !== lesson.filename) throw new Error(`Invalid lesson filename: ${lesson.filename}`)
+    zip.file(safeName, lesson.markdownBody)
   }
 
   return zip.generateAsync({ type: 'arraybuffer' })
