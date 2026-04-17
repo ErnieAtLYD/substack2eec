@@ -12,7 +12,7 @@ const ExportRequestSchema = z.object({
     keyTakeaway: z.string().max(500),
     filename: z.string().regex(/^[a-z0-9][a-z0-9-]+\.md$/).max(80),
   })).min(1).max(50),
-  courseTitle: z.string().min(1).max(200).default('Email Course'),
+  courseTitle: z.string().max(200).default('Email Course').transform(v => v || 'Email Course'),
   courseDescription: z.string().max(1000),
 })
 

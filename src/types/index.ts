@@ -83,7 +83,7 @@ export interface ProposeCoursesResponse {
 
 export interface ExportRequest {
   lessons: GeneratedLesson[]
-  courseTitle: string
+  courseTitle?: string
   courseDescription: string
 }
 
