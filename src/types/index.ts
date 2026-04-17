@@ -42,15 +42,17 @@ export const SubstackPostSchema = z.object({
 export type CuratedLesson = z.infer<typeof CuratedLessonSchema>
 export type CuratedSelection = z.infer<typeof CuratedSelectionSchema>
 
-export interface GeneratedLesson {
-  lessonNumber: number
-  title: string
-  subjectLine: string   // email subject line ≤50 chars
-  previewText: string   // email preview text ≤90 chars
-  markdownBody: string
-  keyTakeaway: string
-  filename: string      // e.g. "lesson-01-why-this-matters.md"
-}
+export const GeneratedLessonSchema = z.object({
+  lessonNumber: z.number(),
+  title: z.string().max(500),
+  subjectLine: z.string().max(50),
+  previewText: z.string().max(90),
+  markdownBody: z.string().max(50_000),
+  keyTakeaway: z.string().max(500),
+  // stem must start and end with alphanumeric — prevents trailing hyphens
+  filename: z.string().regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]\.md$/).max(80),
+})
+export type GeneratedLesson = z.infer<typeof GeneratedLessonSchema>
 
 // API request/response shapes
 export interface FetchPostsRequest {
