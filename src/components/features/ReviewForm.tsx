@@ -334,14 +334,14 @@ export default function ReviewForm() {
         {/* Page header — fetching / picking / generating states */}
         {(step === 'fetching' || step === 'picking' || step === 'generating') && (
           <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-[#00c8a8]/20 mb-6">
-              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-[#00c8a8]">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-teal-primary/20 mb-6">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-teal-primary">
                 <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
                 <path d="M6 12v5c3 3 9 3 12 0v-5" />
               </svg>
             </div>
-            <h1 className="text-4xl font-light tracking-tight text-[#ddeee8] mb-3">Substack to Email Course</h1>
-            <p className="text-[#8ab8a8] text-lg max-w-md mx-auto">
+            <h1 className="text-4xl font-light tracking-tight text-foreground mb-3">Substack to Email Course</h1>
+            <p className="text-teal-subtle text-lg max-w-md mx-auto">
               Transform your Substack newsletter into engaging educational email courses.
               Get 2–3 unique course variations with lessons, takeaways, and action items.
             </p>
@@ -360,24 +360,24 @@ export default function ReviewForm() {
           <div className="w-full max-w-2xl">
             {/* Eyebrow */}
             <div className="flex items-center gap-3 mb-4">
-              <span className="block w-6 h-px bg-[#00c8a8] opacity-70" />
-              <span className="font-mono text-[11px] font-medium tracking-[0.18em] uppercase text-[#00c8a8]">
+              <span className="block w-6 h-px bg-teal-primary opacity-70" />
+              <span className="font-mono text-[11px] font-medium tracking-[0.18em] uppercase text-teal-primary">
                 Educational Email Courses
               </span>
             </div>
 
             {/* Headline */}
-            <h1 className="text-4xl sm:text-5xl font-light leading-tight tracking-tight text-[#ddeee8] mb-3">
+            <h1 className="text-4xl sm:text-5xl font-light leading-tight tracking-tight text-foreground mb-3">
               Transform your{' '}
-              <em className="not-italic font-semibold text-[#5ee8c8]">Substack</em>{' '}
+              <em className="not-italic font-semibold text-teal-accent">Substack</em>{' '}
               archive
             </h1>
-            <p className="text-[#8ab8a8] text-base mb-8 max-w-sm leading-relaxed">
+            <p className="text-teal-subtle text-base mb-8 max-w-sm leading-relaxed">
               Paste any Substack URL and get 2–3 ready-to-send email course variations built from your best content.
             </p>
 
             {/* Form card */}
-            <div className="rounded-2xl border border-[#00c8a8]/20 bg-white/5 p-6">
+            <div className="rounded-2xl border border-teal-primary/20 bg-white/5 p-6">
               <form onSubmit={handleGenerate}>
                 {/* URL row */}
                 <div className="flex gap-3 mb-5">
@@ -387,12 +387,12 @@ export default function ReviewForm() {
                     onChange={e => setUrl(e.target.value)}
                     placeholder="https://yourname.substack.com"
                     required
-                    className="flex-1 min-w-0 rounded-lg border border-[#00c8a8]/20 bg-[#08121c]/80 px-4 py-3 font-mono text-sm text-[#9dcfc4] placeholder-[#8ab8a8]/80 focus:outline-none focus:ring-2 focus:ring-[#00c8a8]/40 focus:border-[#00c8a8]/60"
+                    className="flex-1 min-w-0 rounded-lg border border-teal-primary/20 bg-ink-deeper/80 px-4 py-3 font-mono text-sm text-teal-light placeholder-teal-subtle/80 focus:outline-none focus:ring-2 focus:ring-teal-primary/40 focus:border-teal-primary/60"
                   />
                   <button
                     type="submit"
                     disabled={!url || step !== 'input'}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#00c8a8] px-5 py-3 text-sm font-semibold text-[#052118] transition-colors hover:bg-[#0fe0bc] disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 rounded-lg bg-teal-primary px-5 py-3 text-sm font-semibold text-ink-on-teal transition-colors hover:bg-teal-hover disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <SparkIcon className="w-4 h-4" />
                     Generate
@@ -400,7 +400,7 @@ export default function ReviewForm() {
                 </div>
 
                 {/* Examples */}
-                <p className="font-mono text-[10.5px] font-medium tracking-[0.14em] uppercase text-[#5a8f80] mb-2">
+                <p className="font-mono text-[10.5px] font-medium tracking-[0.14em] uppercase text-teal-dim mb-2">
                   Try an example
                 </p>
                 <div className="flex flex-wrap gap-2 mb-5">
@@ -409,7 +409,7 @@ export default function ReviewForm() {
                       key={ex.label}
                       type="button"
                       onClick={() => setUrl(ex.url)}
-                      className="rounded-full border border-[#00c8a8]/20 bg-[#00c8a8]/10 px-4 py-1.5 text-sm text-[#4ec9b0] transition-colors hover:bg-[#00c8a8]/15 hover:text-[#9eeedd]"
+                      className="rounded-full border border-teal-primary/20 bg-teal-primary/10 px-4 py-1.5 text-sm text-teal-mid transition-colors hover:bg-teal-primary/15 hover:text-teal-lightest"
                     >
                       {ex.label}
                     </button>
@@ -417,13 +417,13 @@ export default function ReviewForm() {
                 </div>
 
                 {/* Divider */}
-                <div className="h-px bg-[#00c8a8]/10 mb-4" />
+                <div className="h-px bg-teal-primary/10 mb-4" />
 
                 {/* Feature tags */}
                 <div className="flex flex-wrap gap-5">
                   {['3–5 emails per course', 'Key takeaways', 'Action items'].map(tag => (
-                    <span key={tag} className="flex items-center gap-1.5 font-mono text-[11px] text-[#5a8f80]">
-                      <span className="inline-block w-1 h-1 rounded-full bg-[#00c8a8] opacity-60" />
+                    <span key={tag} className="flex items-center gap-1.5 font-mono text-[11px] text-teal-dim">
+                      <span className="inline-block w-1 h-1 rounded-full bg-teal-primary opacity-60" />
                       {tag}
                     </span>
                   ))}
@@ -435,8 +435,8 @@ export default function ReviewForm() {
 
         {/* ── FETCHING ── */}
         {step === 'fetching' && (
-          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/5 px-8 py-12 text-center">
-            <p className="font-mono text-sm text-[#4ec9b0] animate-pulse">Fetching posts from Substack…</p>
+          <div className="w-full max-w-2xl rounded-2xl border border-teal-primary/15 bg-white/5 px-8 py-12 text-center">
+            <p className="font-mono text-sm text-teal-mid animate-pulse">Fetching posts from Substack…</p>
           </div>
         )}
 
@@ -444,8 +444,8 @@ export default function ReviewForm() {
         {step === 'picking' && (
           <div className="w-full max-w-4xl">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-light text-[#ddeee8] mb-2">Choose your course theme</h2>
-              <p className="text-[#8ab8a8] text-base max-w-md mx-auto">
+              <h2 className="text-2xl font-light text-foreground mb-2">Choose your course theme</h2>
+              <p className="text-teal-subtle text-base max-w-md mx-auto">
                 We found 3 different courses you could build from this newsletter. Pick the one that fits your audience.
               </p>
             </div>
@@ -453,19 +453,19 @@ export default function ReviewForm() {
               {candidates.map((candidate, i) => (
                 <div
                   key={candidate.courseTitle}
-                  className="rounded-xl border border-[#00c8a8]/15 bg-white/5 overflow-hidden flex flex-col"
+                  className="rounded-xl border border-teal-primary/15 bg-white/5 overflow-hidden flex flex-col"
                 >
                   <div className="px-5 py-5 flex-1">
-                    <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-[#5a8f80] mb-2">
+                    <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-teal-dim mb-2">
                       Option {i + 1}
                     </p>
-                    <h3 className="text-base font-medium text-[#ddeee8] mb-2 leading-snug">{candidate.courseTitle}</h3>
-                    <p className="text-sm text-[#8ab8a8] mb-4 line-clamp-3">{candidate.courseDescription}</p>
+                    <h3 className="text-base font-medium text-foreground mb-2 leading-snug">{candidate.courseTitle}</h3>
+                    <p className="text-sm text-teal-subtle mb-4 line-clamp-3">{candidate.courseDescription}</p>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center rounded-full bg-[#00c8a8]/10 border border-[#00c8a8]/20 px-2.5 py-0.5 font-mono text-xs text-[#4ec9b0]">
+                      <span className="inline-flex items-center rounded-full bg-teal-primary/10 border border-teal-primary/20 px-2.5 py-0.5 font-mono text-xs text-teal-mid">
                         {candidate.lessons.length} lessons
                       </span>
-                      <span className="inline-flex items-center rounded-full bg-[#00c8a8]/10 border border-[#00c8a8]/20 px-2.5 py-0.5 font-mono text-xs text-[#4ec9b0] max-w-[160px] overflow-hidden">
+                      <span className="inline-flex items-center rounded-full bg-teal-primary/10 border border-teal-primary/20 px-2.5 py-0.5 font-mono text-xs text-teal-mid max-w-[160px] overflow-hidden">
                         <span className="truncate min-w-0">{candidate.targetAudience}</span>
                       </span>
                     </div>
@@ -473,7 +473,7 @@ export default function ReviewForm() {
                   <div className="px-5 pb-5">
                     <button
                       onClick={() => handleConfirmCandidate(candidate, fetchedPosts)}
-                      className="w-full rounded-lg bg-[#00c8a8] px-4 py-2.5 text-sm font-semibold text-[#052118] hover:bg-[#0fe0bc] transition-colors"
+                      className="w-full rounded-lg bg-teal-primary px-4 py-2.5 text-sm font-semibold text-ink-on-teal hover:bg-teal-hover transition-colors"
                     >
                       Choose this course →
                     </button>
@@ -484,7 +484,7 @@ export default function ReviewForm() {
             <div className="text-center">
               <button
                 onClick={handleStartOver}
-                className="font-mono text-sm text-[#5a8f80] hover:text-[#4ec9b0] transition-colors"
+                className="font-mono text-sm text-teal-dim hover:text-teal-mid transition-colors"
               >
                 ← Start over
               </button>
@@ -494,11 +494,11 @@ export default function ReviewForm() {
 
         {/* ── GENERATING ── */}
         {step === 'generating' && (
-          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/5 px-8 py-10 space-y-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-teal-primary/15 bg-white/5 px-8 py-10 space-y-4">
             <div className="flex items-center justify-between">
-              <p className="font-mono text-sm text-[#4ec9b0] animate-pulse">Generating your course…</p>
+              <p className="font-mono text-sm text-teal-mid animate-pulse">Generating your course…</p>
               {completedLessonCount > 0 && (
-                <span className="font-mono text-sm tabular-nums text-[#8ab8a8]">
+                <span className="font-mono text-sm tabular-nums text-teal-subtle">
                   {completedLessonCount} / {expectedLessonCount} lessons
                 </span>
               )}
@@ -506,7 +506,7 @@ export default function ReviewForm() {
             {completedLessonCount > 0 && (
               <div className="h-1.5 w-full rounded-full bg-white/10">
                 <div
-                  className="h-1.5 rounded-full bg-[#00c8a8] transition-all duration-500"
+                  className="h-1.5 rounded-full bg-teal-primary transition-all duration-500"
                   style={{ width: `${(completedLessonCount / expectedLessonCount) * 100}%` }}
                 />
               </div>
@@ -519,10 +519,10 @@ export default function ReviewForm() {
             <ul className="space-y-1.5 text-sm">
               {streamLog.map((entry, i) => (
                 // stable enough — entries are append-only
-                <li key={i} className={['flex items-start gap-2', entry.done ? 'text-[#9dcfc4]' : 'text-[#5a8f80]'].join(' ')}>
+                <li key={i} className={['flex items-start gap-2', entry.done ? 'text-teal-light' : 'text-teal-dim'].join(' ')}>
                   {entry.done
-                    ? <span className="mt-0.5 text-[#00c8a8] shrink-0">✓</span>
-                    : <span className="mt-0.5 shrink-0 text-[#5a8f80]">·</span>
+                    ? <span className="mt-0.5 text-teal-primary shrink-0">✓</span>
+                    : <span className="mt-0.5 shrink-0 text-teal-dim">·</span>
                   }
                   <span className="font-mono">{entry.text}</span>
                 </li>
@@ -535,16 +535,16 @@ export default function ReviewForm() {
         {step === 'review' && (
           <div className="w-full max-w-3xl space-y-8">
             {courseMeta.courseTitle && (
-              <div className="rounded-lg border border-[#00c8a8]/15 bg-white/5 px-4 py-3">
-                <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-[#5a8f80] mb-0.5">Course</p>
-                <p className="text-base font-medium text-[#ddeee8]">{courseMeta.courseTitle}</p>
+              <div className="rounded-lg border border-teal-primary/15 bg-white/5 px-4 py-3">
+                <p className="font-mono text-[10px] font-medium uppercase tracking-widest text-teal-dim mb-0.5">Course</p>
+                <p className="text-base font-medium text-foreground">{courseMeta.courseTitle}</p>
                 {courseMeta.courseDescription && (
-                  <p className="mt-1 text-sm text-[#8ab8a8]">{courseMeta.courseDescription}</p>
+                  <p className="mt-1 text-sm text-teal-subtle">{courseMeta.courseDescription}</p>
                 )}
               </div>
             )}
             {skippedCount > 0 && (
-              <p className="font-mono text-sm text-[#5a8f80]">
+              <p className="font-mono text-sm text-teal-dim">
                 {skippedCount} paywalled post{skippedCount !== 1 ? 's' : ''} were skipped.
               </p>
             )}
@@ -555,22 +555,22 @@ export default function ReviewForm() {
             )}
 
             {lessons.map((lesson, i) => (
-              <div key={lesson.lessonNumber} className="rounded-xl border border-[#00c8a8]/15 bg-white/5 overflow-hidden">
-                <div className="flex items-center gap-3 px-4 py-3 border-b border-[#00c8a8]/10 bg-white/[0.03]">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#00c8a8] font-mono text-xs font-bold text-[#052118]">
+              <div key={lesson.lessonNumber} className="rounded-xl border border-teal-primary/15 bg-white/5 overflow-hidden">
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-teal-primary/10 bg-white/[0.03]">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-primary font-mono text-xs font-bold text-ink-on-teal">
                     {lesson.lessonNumber}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium text-[#ddeee8]" title={lesson.title}>{lesson.title}</p>
-                    <p className="truncate font-mono text-xs text-[#5a8f80] mt-0.5">Subject: {lesson.subjectLine}</p>
+                    <p className="truncate text-sm font-medium text-foreground" title={lesson.title}>{lesson.title}</p>
+                    <p className="truncate font-mono text-xs text-teal-dim mt-0.5">Subject: {lesson.subjectLine}</p>
                   </div>
-                  <span className="shrink-0 font-mono text-xs text-[#5a8f80] hidden sm:block">{lesson.filename}</span>
+                  <span className="shrink-0 font-mono text-xs text-teal-dim hidden sm:block">{lesson.filename}</span>
                 </div>
                 <textarea
                   value={lesson.markdownBody}
                   onChange={e => handleLessonEdit(i, e.target.value)}
                   rows={20}
-                  className="w-full px-4 py-3 font-mono text-xs text-[#9dcfc4] bg-transparent focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#00c8a8]/30 resize-y"
+                  className="w-full px-4 py-3 font-mono text-xs text-teal-light bg-transparent focus:outline-none focus:ring-2 focus:ring-inset focus:ring-teal-primary/30 resize-y"
                 />
               </div>
             ))}
@@ -578,13 +578,13 @@ export default function ReviewForm() {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleDownload}
-                className="rounded-lg bg-[#00c8a8] px-5 py-2.5 text-sm font-semibold text-[#052118] hover:bg-[#0fe0bc] transition-colors"
+                className="rounded-lg bg-teal-primary px-5 py-2.5 text-sm font-semibold text-ink-on-teal hover:bg-teal-hover transition-colors"
               >
                 Download ZIP
               </button>
               <button
                 onClick={handleStartOver}
-                className="rounded-lg border border-[#00c8a8]/20 px-5 py-2.5 text-sm font-medium text-[#4ec9b0] hover:bg-[#00c8a8]/10 transition-colors"
+                className="rounded-lg border border-teal-primary/20 px-5 py-2.5 text-sm font-medium text-teal-mid hover:bg-teal-primary/10 transition-colors"
               >
                 Start Over
               </button>
@@ -594,15 +594,15 @@ export default function ReviewForm() {
 
         {/* ── DOWNLOADING ── */}
         {step === 'downloading' && (
-          <div className="w-full max-w-2xl rounded-2xl border border-[#00c8a8]/15 bg-white/5 px-8 py-12 text-center">
-            <p className="font-mono text-sm text-[#4ec9b0] animate-pulse">Preparing your ZIP…</p>
+          <div className="w-full max-w-2xl rounded-2xl border border-teal-primary/15 bg-white/5 px-8 py-12 text-center">
+            <p className="font-mono text-sm text-teal-mid animate-pulse">Preparing your ZIP…</p>
           </div>
         )}
 
       </div>
 
       {/* Footer */}
-      <footer className="py-6 text-center font-mono text-xs text-[#5a8f80] tracking-wide">
+      <footer className="py-6 text-center font-mono text-xs text-teal-dim tracking-wide">
         Powered by AI · Enter any Substack URL to get started
       </footer>
     </div>

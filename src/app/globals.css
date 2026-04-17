@@ -3,11 +3,31 @@
 :root {
   --background: #0d1b2a;
   --foreground: #ddeee8;
+  --teal-primary:   #00c8a8;
+  --teal-hover:     #0fe0bc;
+  --teal-accent:    #5ee8c8;
+  --teal-lightest:  #9eeedd;
+  --teal-mid:       #4ec9b0;
+  --teal-light:     #9dcfc4;
+  --teal-subtle:    #8ab8a8;
+  --teal-dim:       #5a8f80;
+  --ink-deeper:     #08121c;
+  --ink-on-teal:    #052118;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-teal-primary:   var(--teal-primary);
+  --color-teal-hover:     var(--teal-hover);
+  --color-teal-accent:    var(--teal-accent);
+  --color-teal-lightest:  var(--teal-lightest);
+  --color-teal-mid:       var(--teal-mid);
+  --color-teal-light:     var(--teal-light);
+  --color-teal-subtle:    var(--teal-subtle);
+  --color-teal-dim:       var(--teal-dim);
+  --color-ink-deeper:     var(--ink-deeper);
+  --color-ink-on-teal:    var(--ink-on-teal);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
