@@ -8,6 +8,14 @@ interface RateLimitEntry {
 // In-memory store — acceptable for MVP/single-instance; does not survive cold starts
 const store = new Map<string, RateLimitEntry>()
 
+// Prune expired entries every 60 seconds to prevent unbounded map growth
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, entry] of store) {
+    if (now >= entry.resetAt) store.delete(key)
+  }
+}, 60_000)
+
 function isRateLimited(key: string, limit: number, windowMs: number): boolean {
   const now = Date.now()
   const entry = store.get(key)

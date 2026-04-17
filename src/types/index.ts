@@ -34,7 +34,7 @@ export const SubstackPostSchema = z.object({
   publishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
   bodyHtml: z.string().max(500_000),
   excerpt: z.string().max(500),
-  bodyText: z.string(),
+  bodyText: z.string().max(100_000),
   audience: z.enum(['everyone', 'paid']),
   wordCount: z.number().int().min(0).max(100_000),
 })
