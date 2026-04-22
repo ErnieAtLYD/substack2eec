@@ -24,10 +24,7 @@ describe('parseLessonMarkdown — filename safeSlug normalization', () => {
   })
 
   it('strips leading hyphens when slug starts with non-alphanumeric chars', () => {
-    // '!!!' → '---' after replace; strip-edges removes leading hyphens too
-    const slug = '!!!something-useful'
-    const lesson = parseLessonMarkdown(minimalMarkdown(2), 2, slug)
-    expect(lesson.filename).not.toMatch(/^lesson-02--.md/)
+    const lesson = parseLessonMarkdown(minimalMarkdown(2), 2, '!!!something-useful')
     expect(lesson.filename).toMatch(/^lesson-02-something/)
     expect(() => GeneratedLessonSchema.parse(lesson)).not.toThrow()
   })
