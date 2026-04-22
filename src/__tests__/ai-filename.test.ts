@@ -15,11 +15,17 @@ function minimalMarkdown(lessonNum: number) {
 
 describe('parseLessonMarkdown — filename safeSlug normalization', () => {
   it('strips a single trailing hyphen when slug truncates at position 40', () => {
-    // slug is 41 chars with a hyphen at position 40 (0-indexed: char 39 is '-')
-    const slug = 'a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-rs-t'
-    // after replace (no change) + slice(0,40): 'a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-rs-'
+    // 42-char slug; char 39 (0-indexed) is '-', so slice(0,40) ends with '-'
+    const slug = 'a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-uv'
+    // after replace (no change) + slice(0,40): 'a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-'
     const lesson = parseLessonMarkdown(minimalMarkdown(1), 1, slug)
     expect(lesson.filename).not.toMatch(/-\.md$/)
+    expect(() => GeneratedLessonSchema.parse(lesson)).not.toThrow()
+  })
+
+  it('strips leading hyphens when slug starts with non-alphanumeric chars', () => {
+    const lesson = parseLessonMarkdown(minimalMarkdown(2), 2, '!!!something-useful')
+    expect(lesson.filename).toMatch(/^lesson-02-something/)
     expect(() => GeneratedLessonSchema.parse(lesson)).not.toThrow()
   })
 
