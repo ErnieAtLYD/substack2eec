@@ -282,76 +282,29 @@ export default function ReviewForm() {
       })
 
       if (!res.ok || !res.body) {
+        clearSlowTimer()
         setError('Failed to start course generation')
         setStep('picking')
-        clearSlowTimer()
         return
       }
 
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const parts = buffer.split('\n\n')
-        buffer = parts.pop() ?? ''
-
-        for (const part of parts) {
-          if (!part.startsWith('data: ')) continue
-          let event: CurateSSEEvent
-          try {
-            event = JSON.parse(part.slice(6)) as CurateSSEEvent
-          } catch {
-            continue
-          }
-
-          // courseMeta already set from confirmed candidate — selection event is informational only
-          if (event.type === 'selection') {
-            setStreamLog(prev => [...prev, { text: `Course: "${event.data.courseTitle}"`, done: false }])
-          } else if (event.type === 'lesson_start') {
-            setStreamLog(prev => [...prev, { text: `Writing lesson ${event.lessonNumber}…`, done: false }])
-          } else if (event.type === 'lesson_done') {
-            inProgressLessons.push(event.lesson)
-            writeSessionLessons([...inProgressLessons])
-            setCompletedLessonCount(inProgressLessons.length)
-            setStreamLog(prev => [...prev, { text: `Lesson ${event.lesson.lessonNumber}: ${event.lesson.title}`, done: true }])
-          } else if (event.type === 'done') {
-            clearSlowTimer()
-            updateLessons(event.lessons)
+      for await (const event of parseSSEStream(res.body.getReader())) {
+        const outcome = applyCurateEvent(event, inProgressLessons)
+        if (outcome.status === 'done') return
+        if (outcome.status === 'error') {
+          setError(outcome.message)
+          // If we have partial lessons, let user review what arrived
+          if (inProgressLessons.length > 0) {
+            updateLessons(inProgressLessons)
             setStep('review')
-            return
-          } else if (event.type === 'error') {
-            clearSlowTimer()
-            setError(event.message)
-            // If we have partial lessons, let user review what arrived
-            if (inProgressLessons.length > 0) {
-              updateLessons(inProgressLessons)
-              setStep('review')
-            } else {
-              setStep('picking')
-            }
-            return
+          } else {
+            setStep('picking')
           }
+          return
         }
       }
     } catch {
-      clearSlowTimer()
-      // Recover partial lessons from sessionStorage if stream died
-      const saved = readSessionLessons()
-      const meta = readSessionMeta()
-      if (saved && saved.length > 0) {
-        setLessons(saved)
-        if (meta) setCourseMeta(meta)
-        setError('Generation interrupted. Showing lessons completed so far.')
-        setStep('review')
-      } else {
-        setError('Network error during generation. Please try again.')
-        setStep('picking')
-      }
+      recoverFromStreamException()
     }
   }
 
