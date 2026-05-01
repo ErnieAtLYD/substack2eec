@@ -72,6 +72,37 @@ const EXAMPLES = [
   { label: 'Not Boring',       url: 'https://notboring.substack.com' },
 ] as const
 
+/**
+ * Parse a Server-Sent Events stream of `CurateSSEEvent` JSON frames.
+ *
+ * Owns buffering across `read()` chunks, splits on `\n\n`, strips the `data: `
+ * prefix, and `JSON.parse`s each frame. Malformed frames and non-`data:` lines
+ * are silently skipped, matching the prior inline behavior.
+ *
+ * Exported for unit tests; not part of the component's public API.
+ */
+export async function* parseSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): AsyncGenerator<CurateSSEEvent> {
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) return
+    buffer += decoder.decode(value, { stream: true })
+    const parts = buffer.split('\n\n')
+    buffer = parts.pop() ?? ''
+    for (const part of parts) {
+      if (!part.startsWith('data: ')) continue
+      try {
+        yield JSON.parse(part.slice(6)) as CurateSSEEvent
+      } catch {
+        // Malformed frame — skip, matching prior behavior.
+      }
+    }
+  }
+}
+
 // Spark icon used in the generate button
 function SparkIcon({ className }: { className?: string }) {
   return (
