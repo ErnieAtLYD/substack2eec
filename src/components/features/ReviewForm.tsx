@@ -210,6 +210,59 @@ export default function ReviewForm() {
     }
   }
 
+  type CurateOutcome =
+    | { status: 'continue' }
+    | { status: 'done' }
+    | { status: 'error'; message: string }
+
+  function applyCurateEvent(
+    event: CurateSSEEvent,
+    inProgressLessons: GeneratedLesson[],
+  ): CurateOutcome {
+    switch (event.type) {
+      // courseMeta already set from confirmed candidate — selection event is informational only
+      case 'selection':
+        setStreamLog(prev => [...prev, { text: `Course: "${event.data.courseTitle}"`, done: false }])
+        return { status: 'continue' }
+      case 'lesson_start':
+        setStreamLog(prev => [...prev, { text: `Writing lesson ${event.lessonNumber}…`, done: false }])
+        return { status: 'continue' }
+      case 'lesson_done':
+        inProgressLessons.push(event.lesson)
+        writeSessionLessons([...inProgressLessons])
+        setCompletedLessonCount(inProgressLessons.length)
+        setStreamLog(prev => [...prev, { text: `Lesson ${event.lesson.lessonNumber}: ${event.lesson.title}`, done: true }])
+        return { status: 'continue' }
+      case 'done':
+        clearSlowTimer()
+        updateLessons(event.lessons)
+        setStep('review')
+        return { status: 'done' }
+      case 'error':
+        clearSlowTimer()
+        return { status: 'error', message: event.message }
+      case 'lesson_chunk':
+        // Currently no UI for streaming partial lesson text — preserve prior silent-skip behavior.
+        return { status: 'continue' }
+    }
+  }
+
+  function recoverFromStreamException() {
+    clearSlowTimer()
+    // Recover partial lessons from sessionStorage if stream died
+    const saved = readSessionLessons()
+    const meta = readSessionMeta()
+    if (saved && saved.length > 0) {
+      setLessons(saved)
+      if (meta) setCourseMeta(meta)
+      setError('Generation interrupted. Showing lessons completed so far.')
+      setStep('review')
+    } else {
+      setError('Network error during generation. Please try again.')
+      setStep('picking')
+    }
+  }
+
   async function handleConfirmCandidate(candidate: CuratedSelection, posts: SubstackPost[]) {
     setCourseMeta({ courseTitle: candidate.courseTitle, courseDescription: candidate.courseDescription })
     writeSessionMeta({ courseTitle: candidate.courseTitle, courseDescription: candidate.courseDescription })
