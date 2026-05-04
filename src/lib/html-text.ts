@@ -32,10 +32,30 @@ export function extractTextFromHtml(html: string, options: ExtractTextOptions = 
     .replace(/[ \t]{2,}/g, ' ')
     .trim()
 
-  const words = text.split(/\s+/)
-  if (words.length <= MAX_POST_WORDS) return text
+  return truncateTextToWords(text, MAX_POST_WORDS, options.truncationMarker)
+}
 
-  let candidate = words.slice(0, MAX_POST_WORDS).join(' ')
+// Truncates by walking the original string's word boundaries, preserving any
+// existing whitespace (notably \n\n paragraph breaks) within the kept slice.
+export function truncateTextToWords(
+  text: string,
+  maxWords: number,
+  truncationMarker = '',
+): string {
+  const wordRe = /\S+/g
+  let count = 0
+  let cutIndex = -1
+  let m: RegExpExecArray | null
+  while ((m = wordRe.exec(text)) !== null) {
+    count++
+    if (count > maxWords) {
+      cutIndex = m.index
+      break
+    }
+  }
+  if (cutIndex === -1) return text
+
+  let candidate = text.slice(0, cutIndex).trimEnd()
   const lastSentenceEnd = Math.max(
     candidate.lastIndexOf('. '),
     candidate.lastIndexOf('! '),
@@ -45,5 +65,5 @@ export function extractTextFromHtml(html: string, options: ExtractTextOptions = 
     candidate = candidate.slice(0, lastSentenceEnd + 1)
   }
 
-  return candidate + (options.truncationMarker ?? '')
+  return candidate + truncationMarker
 }
