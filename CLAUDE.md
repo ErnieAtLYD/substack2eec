@@ -36,7 +36,7 @@ src/
 - Route Handlers use Node runtime (not Edge) — needed for `setTimeout` rate limiting
 - `export const maxDuration = 180` on `/api/curate`; `export const maxDuration = 60` on `/api/propose-courses`
 - Substack fetcher: 1 req/sec, exponential backoff on 429
-- `MAX_POST_WORDS = 2500` in `src/lib/substack.ts` — truncation at extraction time
+- `MAX_POST_WORDS = 2500` in `src/lib/html-text.ts` — truncation at extraction time (shared by `src/lib/substack.ts` and `spike/extract.ts`)
 
 
 

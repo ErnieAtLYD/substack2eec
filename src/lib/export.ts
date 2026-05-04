@@ -3,7 +3,7 @@ import path from 'path'
 import JSZip from 'jszip'
 import type { GeneratedLesson } from '@/types'
 
-export function buildReadme(
+function buildReadme(
   courseTitle: string,
   courseDescription: string,
   lessons: GeneratedLesson[],

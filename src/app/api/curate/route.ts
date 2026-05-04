@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown, sanitizeForPrompt } from '@/lib/ai'
+import { MAX_POST_WORDS, truncateTextToWords } from '@/lib/html-text'
 import type { GeneratedLesson, CurateSSEEvent, LessonCount, CuratedSelection } from '@/types'
 import { MAX_BODY_CHARS, CuratedSelectionSchema, SubstackPostSchema, isLessonCount } from '@/types'
 
@@ -23,9 +24,15 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
   const body = parsed.data
 
+  // Defense-in-depth: char slice bounds DoS surface before the word-aware
+  // truncation does the cap that the LLM budget actually depends on. UI callers
+  // already pre-truncate; this is the enforcement point for direct API callers.
   const posts = body.posts.map(p => ({
     ...p,
-    bodyText: typeof p.bodyText === 'string' ? p.bodyText.slice(0, MAX_BODY_CHARS) : '',
+    bodyText: truncateTextToWords(
+      (typeof p.bodyText === 'string' ? p.bodyText : '').slice(0, MAX_BODY_CHARS),
+      MAX_POST_WORDS,
+    ),
   }))
 
   // Validate selectedCourse slug cross-reference before opening the stream

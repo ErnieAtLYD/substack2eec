@@ -1,8 +1,6 @@
 import 'server-only'
-import { load } from 'cheerio'
 import type { SubstackPost } from '@/types'
-
-export const MAX_POST_WORDS = 2500
+import { extractTextFromHtml } from './html-text'
 
 // ---------------------------------------------------------------------------
 // URL helpers
@@ -46,54 +44,6 @@ async function fetchWithRetry(url: string, retries = 3): Promise<Response> {
     return res
   }
   throw new Error(`Request failed after ${retries} retries: ${url}`)
-}
-
-// ---------------------------------------------------------------------------
-// HTML extraction
-// ---------------------------------------------------------------------------
-
-export function extractTextFromHtml(html: string): string {
-  const $ = load(html)
-
-  $(
-    [
-      '.subscription-widget',
-      '.share-widget',
-      '.subscribe-widget',
-      '.button-wrapper',
-      '.captioned-button-wrap',
-      '.tweet',
-      'footer',
-      'figure',
-      '.footnote',
-      'script',
-      'style',
-    ].join(', ')
-  ).remove()
-
-  // Preserve paragraph breaks before extracting
-  $('p, h1, h2, h3, h4, li').after('\n\n')
-
-  const text = $('body').text()
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim()
-
-  const words = text.split(/\s+/)
-  if (words.length <= MAX_POST_WORDS) return text
-
-  // Truncate to word ceiling then walk back to sentence boundary
-  let candidate = words.slice(0, MAX_POST_WORDS).join(' ')
-  const lastSentenceEnd = Math.max(
-    candidate.lastIndexOf('. '),
-    candidate.lastIndexOf('! '),
-    candidate.lastIndexOf('? '),
-  )
-  if (lastSentenceEnd > 0) {
-    candidate = candidate.slice(0, lastSentenceEnd + 1)
-  }
-
-  return candidate
 }
 
 // ---------------------------------------------------------------------------

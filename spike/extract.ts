@@ -8,58 +8,9 @@
  *   npx tsx spike/extract.ts https://simonwillison.substack.com 3
  */
 
-import { load } from 'cheerio'
+import { extractTextFromHtml } from '../src/lib/html-text'
 
-const MAX_POST_WORDS = 2500
-
-// ---------------------------------------------------------------------------
-// Extraction
-// ---------------------------------------------------------------------------
-
-function extractTextFromHtml(html: string): string {
-  const $ = load(html)
-
-  // Strip non-content noise
-  $(
-    [
-      '.subscription-widget',
-      '.share-widget',
-      '.subscribe-widget',
-      '.button-wrapper',
-      '.captioned-button-wrap',
-      '.tweet',
-      'footer',
-      'figure',         // images — captions are rarely useful for rewriting
-      '.footnote',
-      'script',
-      'style',
-    ].join(', ')
-  ).remove()
-
-  // Preserve paragraph breaks before extracting text
-  $('p, h1, h2, h3, h4, li').after('\n\n')
-
-  const text = $('body').text()
-    .replace(/\n{3,}/g, '\n\n')   // collapse excessive blank lines
-    .replace(/[ \t]{2,}/g, ' ')   // collapse inline whitespace
-    .trim()
-
-  const words = text.split(/\s+/)
-  if (words.length <= MAX_POST_WORDS) return text
-
-  // Truncate to word ceiling, then walk back to the last sentence boundary
-  let candidate = words.slice(0, MAX_POST_WORDS).join(' ')
-  const lastSentenceEnd = Math.max(
-    candidate.lastIndexOf('. '),
-    candidate.lastIndexOf('! '),
-    candidate.lastIndexOf('? '),
-  )
-  if (lastSentenceEnd > 0) {
-    candidate = candidate.slice(0, lastSentenceEnd + 1)
-  }
-
-  return candidate + '\n\n[truncated]'
-}
+const TRUNCATION_MARKER = '\n\n[truncated]'
 
 // ---------------------------------------------------------------------------
 // Substack API helpers
@@ -137,9 +88,9 @@ async function main() {
     await sleep(1_000)  // 1 req/sec
     const post = await fetchFullPost(pub, slug)
 
-    const extracted = extractTextFromHtml(post.body_html)
+    const extracted = extractTextFromHtml(post.body_html, { truncationMarker: TRUNCATION_MARKER })
     const wordCount = extracted.split(/\s+/).length
-    const wasTruncated = extracted.endsWith('[truncated]')
+    const wasTruncated = extracted.endsWith(TRUNCATION_MARKER)
 
     console.log('─'.repeat(72))
     console.log(`TITLE:     ${post.title}`)
