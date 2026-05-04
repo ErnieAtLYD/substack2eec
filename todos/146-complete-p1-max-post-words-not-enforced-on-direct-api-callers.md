@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p1
 issue_id: "146"
 tags: [code-review, security, regression, prompt-injection, dos]
@@ -73,6 +73,7 @@ _Pending triage._ Lean toward Option A or C — the original 009 fix established
 ## Work Log
 
 _2026-05-02:_ Filed during code review of html-text extraction refactor.
+_2026-05-04:_ Resolved in commit 56a630a. Applied `truncateTextToWords(p.bodyText.slice(0, MAX_BODY_CHARS), MAX_POST_WORDS)` in `src/app/api/curate/route.ts` so the cap runs at the trust boundary. Regression test in `src/__tests__/curate-route-word-cap.test.ts` confirms 4,000-word `bodyText` is reduced to ≤ MAX_POST_WORDS before reaching the AI module.
 
 ## Resources
 

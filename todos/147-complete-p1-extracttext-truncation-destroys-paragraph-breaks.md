@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p1
 issue_id: "147"
 tags: [code-review, quality, llm-input, html-extraction]
@@ -77,6 +77,7 @@ Test case to lock behavior in: a 5,000-word HTML body with paragraph tags should
 ## Work Log
 
 _2026-05-02:_ Filed during code review of html-text extraction refactor.
+_2026-05-04:_ Resolved in commit 5322d56 via Option A. Replaced `text.split(/\s+/).slice().join(' ')` with a `\S+` cursor that walks word boundaries on the original string and slices at the cut index, preserving `\n\n` within the kept range. Truncation is now a separate `truncateTextToWords` helper reused by the curate route (#146).
 
 ## Resources
 

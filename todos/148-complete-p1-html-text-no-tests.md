@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p1
 issue_id: "148"
 tags: [code-review, testing, quality]
@@ -54,6 +54,7 @@ _Pending triage._ Land before #147 / #155 so those refactors have a regression n
 ## Work Log
 
 _2026-05-02:_ Filed during code review of html-text extraction refactor.
+_2026-05-04:_ Resolved in commit 5322d56. Added `src/lib/__tests__/html-text.test.ts` with 13 cases covering `extractTextFromHtml` (block-element paragraph breaks, noise-selector removal, marker semantics, paragraph preservation across the truncation boundary, empty input) and `truncateTextToWords` (under cap, exactly at cap, sentence-boundary walkback, no-boundary fallback, marker conditional, paragraph preservation, empty input).
 
 ## Resources
 
