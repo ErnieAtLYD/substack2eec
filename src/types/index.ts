@@ -12,7 +12,7 @@ export interface SubstackPost {
   wordCount: number  // original word count from Substack API (pre-truncation)
 }
 
-export const CuratedLessonSchema = z.object({
+const CuratedLessonSchema = z.object({
   slug: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).max(100),
   sequencePosition: z.number().int().min(1).max(10),
   lessonFocus: z.string().max(300),
@@ -64,7 +64,7 @@ export interface FetchPostsResponse {
   skippedCount: number  // paywalled posts skipped
 }
 
-export const ALLOWED_LESSON_COUNTS = [3, 5, 7, 10] as const
+const ALLOWED_LESSON_COUNTS = [3, 5, 7, 10] as const
 export type LessonCount = typeof ALLOWED_LESSON_COUNTS[number]
 
 export function isLessonCount(value: unknown): value is LessonCount {
