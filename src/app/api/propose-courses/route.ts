@@ -32,7 +32,19 @@ export async function POST(request: NextRequest): Promise<Response> {
     const candidates = await proposeCourseCandidates(body.posts, lessonCount)
     return NextResponse.json<ProposeCoursesResponse>({ candidates })
   } catch (err) {
-    console.error('[propose-courses] error:', err)
+    // Vercel's log table truncates Error.toString() at ~30 chars. Emit a flat
+    // JSON record so the cause is visible without expanding the row. Anthropic
+    // SDK errors expose .status/.headers; duck-type to avoid a route-level
+    // import of the SDK.
+    const detail: Record<string, unknown> =
+      err instanceof Error
+        ? { name: err.name, message: err.message }
+        : { value: String(err) }
+    if (err && typeof err === 'object' && 'status' in err) {
+      detail.status = (err as { status?: unknown }).status
+    }
+    console.error('[propose-courses] error:', JSON.stringify(detail))
+
     const userMessage = err instanceof Error && err.message.startsWith('Candidate proposal')
       ? err.message
       : 'Failed to generate course candidates. Please try again.'
