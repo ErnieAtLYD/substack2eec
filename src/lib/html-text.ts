@@ -1,6 +1,7 @@
 import { load } from 'cheerio'
 
 export const MAX_POST_WORDS = 2500
+export const MAX_HTML_LEN = 500_000
 
 const NOISE_SELECTORS = [
   '.subscription-widget',
@@ -21,7 +22,9 @@ export interface ExtractTextOptions {
 }
 
 export function extractTextFromHtml(html: string, options: ExtractTextOptions = {}): string {
-  const $ = load(html)
+  // Defensive check against extremely large payloads to avoid DoS in cheerio
+  const truncatedHtml = html.length > MAX_HTML_LEN ? html.slice(0, MAX_HTML_LEN) : html
+  const $ = load(truncatedHtml)
 
   $(NOISE_SELECTORS).remove()
 

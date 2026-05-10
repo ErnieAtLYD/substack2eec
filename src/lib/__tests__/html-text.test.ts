@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractTextFromHtml, truncateTextToWords, MAX_POST_WORDS } from '../html-text'
+import { extractTextFromHtml, truncateTextToWords, MAX_POST_WORDS, MAX_HTML_LEN } from '../html-text'
 
 describe('extractTextFromHtml', () => {
   it('returns plain text for a short post unchanged', () => {
@@ -50,6 +50,14 @@ describe('extractTextFromHtml', () => {
     expect(out).toContain('\n\n')                    // paragraph breaks survived truncation
     expect(out.endsWith('\n\n[truncated]')).toBe(true)
     expect(out.split(/\s+/).length).toBeLessThanOrEqual(MAX_POST_WORDS + 5) // marker adds 1 word
+  })
+
+  it('truncates extremely large HTML payloads before parsing', () => {
+    // 100 chars extra
+    const largeHtml = '<html><body>' + 'a'.repeat(MAX_HTML_LEN + 100) + '</body></html>'
+    // This should not crash and should return some text
+    const out = extractTextFromHtml(largeHtml)
+    expect(out.length).toBeLessThanOrEqual(MAX_HTML_LEN)
   })
 })
 
