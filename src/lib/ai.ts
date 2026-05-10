@@ -82,7 +82,9 @@ one coherent topic — delivered one lesson at a time.
 // Sanitizes user-controlled strings for plain-text prompt context: collapses whitespace
 // and caps length. For XML block context, also apply xmlEscape after this call.
 export function sanitizeForPrompt(s: string): string {
-  return s.slice(0, MAX_PROMPT_FIELD_LEN).replace(/[\n\r\t]/g, ' ')
+  // Use spread to correctly handle surrogate pairs during truncation.
+  // [...s] gives us an array of Unicode code points (as strings).
+  return [...s].slice(0, MAX_PROMPT_FIELD_LEN).join('').replace(/[\n\r\t]/g, ' ')
 }
 
 function formatPostsForCuration(posts: Pick<SubstackPost, 'slug' | 'title' | 'subtitle' | 'publishedAt' | 'wordCount' | 'excerpt'>[]): string {
