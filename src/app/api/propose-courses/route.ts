@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { proposeCourseCandidates, isAnthropicQuotaError } from '@/lib/ai'
 import { logError } from '@/lib/log-error'
-import { SubstackPostSchema } from '@/types'
+import { safeSlice } from '@/lib/safe-string'
+import { MAX_PROMPT_FIELD_LEN } from '@/lib/limits'
+import { SubstackPostInputSchema } from '@/types'
 import type { LessonCount, ProposeCoursesResponse } from '@/types'
 
 export const maxDuration = 60
 
 const ProposeRequestSchema = z.object({
-  posts: z.array(SubstackPostSchema.pick({
+  posts: z.array(SubstackPostInputSchema.pick({
     slug: true,
     title: true,
     subtitle: true,
@@ -27,10 +29,20 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
   const body = parsed.data
 
+  // Trust boundary: cap every short field that reaches the LLM. Same discipline
+  // as /api/curate. Schema picks only short fields (no bodyText/bodyHtml here),
+  // so no word cap is needed. slug/audience/wordCount/publishedAt left untouched.
+  const posts = body.posts.map(p => ({
+    ...p,
+    title:    safeSlice(p.title, MAX_PROMPT_FIELD_LEN),
+    subtitle: p.subtitle === null ? null : safeSlice(p.subtitle, MAX_PROMPT_FIELD_LEN),
+    excerpt:  safeSlice(p.excerpt, MAX_PROMPT_FIELD_LEN),
+  }))
+
   const lessonCount: LessonCount = body.lessonCount ?? 5
 
   try {
-    const candidates = await proposeCourseCandidates(body.posts, lessonCount)
+    const candidates = await proposeCourseCandidates(posts, lessonCount)
     return NextResponse.json<ProposeCoursesResponse>({ candidates })
   } catch (err) {
     logError('[propose-courses] error:', err)

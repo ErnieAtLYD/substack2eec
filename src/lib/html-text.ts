@@ -1,6 +1,8 @@
 import { load } from 'cheerio'
+import { MAX_POST_WORDS } from '@/lib/limits'
 
-export const MAX_POST_WORDS = 2500
+// Re-export for back-compat with existing imports.
+export { MAX_POST_WORDS }
 
 const NOISE_SELECTORS = [
   '.subscription-widget',

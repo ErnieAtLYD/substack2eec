@@ -1,0 +1,17 @@
+// Trust-boundary input caps. Single source of truth for "how much
+// attacker-controlled string can reach the LLM." Imported by route handlers
+// (where caps are enforced) and by helpers in src/lib/ai.ts (defense-in-depth
+// assertions). No 'server-only' import — these are constants, not secrets.
+
+// Short prompt-bound fields (title, subtitle, excerpt, lesson titles, etc.)
+export const MAX_PROMPT_FIELD_LEN = 300 as const
+
+// DoS bound on bodyText after safeSlice; truncateTextToWords does the
+// semantic narrowing. 30_000 chars is generous enough that the word cap is
+// the binding constraint for typical English (was 15_000, which shadowed
+// MAX_POST_WORDS for most posts — see plan 2026-05-10).
+export const MAX_BODY_CHARS = 30_000 as const
+
+// LLM-budget cap on bodyText words. Binding constraint for typical English;
+// MAX_BODY_CHARS only fires for non-Latin / emoji-heavy content.
+export const MAX_POST_WORDS = 2500 as const

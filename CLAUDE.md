@@ -36,7 +36,11 @@ src/
 - Route Handlers use Node runtime (not Edge) — needed for `setTimeout` rate limiting
 - `export const maxDuration = 180` on `/api/curate`; `export const maxDuration = 60` on `/api/propose-courses`
 - Substack fetcher: 1 req/sec, exponential backoff on 429
-- `MAX_POST_WORDS = 2500` in `src/lib/html-text.ts` — truncation at extraction time (shared by `src/lib/substack.ts` and `spike/extract.ts`)
+- Trust-boundary input caps live in `src/lib/limits.ts` — single source of truth:
+  - `MAX_PROMPT_FIELD_LEN = 300` — short prompt-bound fields (title, subtitle, excerpt, lesson titles)
+  - `MAX_BODY_CHARS = 30_000` — DoS bound on `bodyText` (binding constraint for typical English is `MAX_POST_WORDS`)
+  - `MAX_POST_WORDS = 2500` — LLM-budget cap on `bodyText` (truncation at extraction time and at the route boundary)
+- Trust-boundary discipline: any route handler that forwards user input to `src/lib/ai.ts` MUST cap every string field at the boundary using `safeSlice` (from `src/lib/safe-string.ts`) and the constants in `src/lib/limits.ts`. Helpers in `src/lib/ai.ts` (`collapsePromptWhitespace`) MUST assert (not silently re-truncate) when input exceeds the documented cap — silent re-truncation hides regressions like #146.
 
 
 
