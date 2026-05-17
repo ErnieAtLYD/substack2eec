@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { normalizeSubstackUrl, fetchPublicPosts } from '@/lib/substack'
+import { logError } from '@/lib/log-error'
 import type { FetchPostsRequest, FetchPostsResponse } from '@/types'
 
 export async function POST(request: NextRequest): Promise<NextResponse<FetchPostsResponse | { error: string }>> {
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<FetchPost
   try {
     result = await fetchPublicPosts(pub, 50)
   } catch (err) {
+    logError('[fetch-posts] error:', err)
     const msg = err instanceof Error ? err.message : 'Failed to fetch posts'
     const status = msg.includes('HTTP 404') ? 404 : msg.includes('HTTP 429') ? 503 : 500
     return NextResponse.json({ error: msg }, { status })

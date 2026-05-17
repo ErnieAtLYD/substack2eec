@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown, sanitizeForPrompt } from '@/lib/ai'
+import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown, sanitizeForPrompt, isAnthropicQuotaError } from '@/lib/ai'
+import { logError } from '@/lib/log-error'
 import { MAX_POST_WORDS, truncateTextToWords } from '@/lib/html-text'
 import type { GeneratedLesson, CurateSSEEvent, LessonCount, CuratedSelection } from '@/types'
 import { MAX_BODY_CHARS, CuratedSelectionSchema, SubstackPostSchema, isLessonCount } from '@/types'
@@ -106,10 +107,14 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         enqueue({ type: 'done', lessons: completedLessons })
       } catch (err) {
-        console.error('[curate] stream error:', err)
-        const message = err instanceof Error && err.message.startsWith('No suitable posts')
-          ? err.message
-          : 'An error occurred generating your course. Please try again.'
+        logError('[curate] stream error:', err)
+        // SSE response status was already sent (200) when the stream opened, so
+        // we can't return 503 here — communicate via the error event message.
+        const message = isAnthropicQuotaError(err)
+          ? 'AI service temporarily unavailable. Please try again later.'
+          : err instanceof Error && err.message.startsWith('No suitable posts')
+            ? err.message
+            : 'An error occurred generating your course. Please try again.'
         enqueue({ type: 'error', message })
       } finally {
         controller.close()

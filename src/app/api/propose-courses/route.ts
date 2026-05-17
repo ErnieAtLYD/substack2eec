@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { proposeCourseCandidates } from '@/lib/ai'
+import { proposeCourseCandidates, isAnthropicQuotaError } from '@/lib/ai'
+import { logError } from '@/lib/log-error'
 import { SubstackPostSchema } from '@/types'
 import type { LessonCount, ProposeCoursesResponse } from '@/types'
 
@@ -32,19 +33,13 @@ export async function POST(request: NextRequest): Promise<Response> {
     const candidates = await proposeCourseCandidates(body.posts, lessonCount)
     return NextResponse.json<ProposeCoursesResponse>({ candidates })
   } catch (err) {
-    // Vercel's log table truncates Error.toString() at ~30 chars. Emit a flat
-    // JSON record so the cause is visible without expanding the row. Anthropic
-    // SDK errors expose .status/.headers; duck-type to avoid a route-level
-    // import of the SDK.
-    const detail: Record<string, unknown> =
-      err instanceof Error
-        ? { name: err.name, message: err.message }
-        : { value: String(err) }
-    if (err && typeof err === 'object' && 'status' in err) {
-      detail.status = (err as { status?: unknown }).status
+    logError('[propose-courses] error:', err)
+    if (isAnthropicQuotaError(err)) {
+      return NextResponse.json(
+        { error: 'AI service temporarily unavailable. Please try again later.' },
+        { status: 503 },
+      )
     }
-    console.error('[propose-courses] error:', JSON.stringify(detail))
-
     const userMessage = err instanceof Error && err.message.startsWith('Candidate proposal')
       ? err.message
       : 'Failed to generate course candidates. Please try again.'

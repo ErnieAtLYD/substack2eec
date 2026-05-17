@@ -13,6 +13,19 @@ const MODEL = 'claude-sonnet-4-6'
 
 const MAX_PROMPT_FIELD_LEN = 300
 
+// True for the specific Anthropic 400 we've actually observed in prod:
+// "Your credit balance is too low to access the Anthropic API." Also matches
+// the related `monthly_cost_limit` message. Intentionally narrow — generic
+// 400s should still surface as 500s so genuine code bugs don't hide as
+// "service unavailable".
+export function isAnthropicQuotaError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  const status = (err as { status?: unknown }).status
+  if (status !== 400) return false
+  return /credit balance is too low/i.test(err.message)
+    || /monthly_cost_limit/i.test(err.message)
+}
+
 // Escapes XML element content. NOT safe for XML attribute values (does not escape quotes).
 // If embedding in an attribute value context, also escape " and '.
 function xmlEscape(s: string): string {
