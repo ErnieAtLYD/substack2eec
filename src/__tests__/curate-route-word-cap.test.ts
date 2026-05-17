@@ -7,12 +7,16 @@ vi.mock('server-only', () => ({}))
 const curatePostSelection = vi.fn()
 const rewriteAsLesson = vi.fn()
 
-vi.mock('@/lib/ai', () => ({
-  curatePostSelection: (...args: unknown[]) => curatePostSelection(...args),
-  rewriteAsLesson: (...args: unknown[]) => rewriteAsLesson(...args),
-  parseLessonMarkdown: vi.fn(),
-  sanitizeForPrompt: (s: string) => s,
-}))
+vi.mock('@/lib/ai', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/ai')>('@/lib/ai')
+  return {
+    curatePostSelection: (...args: unknown[]) => curatePostSelection(...args),
+    rewriteAsLesson: (...args: unknown[]) => rewriteAsLesson(...args),
+    parseLessonMarkdown: vi.fn(),
+    sanitizeForPrompt: (s: string) => s,
+    isAnthropicQuotaError: actual.isAnthropicQuotaError,
+  }
+})
 
 function postFixture(overrides: Record<string, unknown> = {}) {
   return {
