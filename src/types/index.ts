@@ -5,7 +5,9 @@ export interface SubstackPost {
   subtitle: string | null
   slug: string
   publishedAt: string
-  bodyHtml: string
+  // Optional: present on /api/fetch-posts output, stripped by SubstackPostInputSchema
+  // on /api/curate and /api/propose-courses so it doesn't traverse those wires.
+  bodyHtml?: string
   excerpt: string    // first 200 chars of extracted plain text — used in curation prompt
   bodyText: string   // full extracted plain text, truncated to MAX_POST_WORDS
   audience: 'everyone' | 'paid'
@@ -27,16 +29,30 @@ export const CuratedSelectionSchema = z.object({
   lessons: z.array(CuratedLessonSchema).min(1).max(10),
 })
 
-export const SubstackPostSchema = z.object({
+// Common fields validated identically across all route inputs and the
+// fetch-posts output. bodyHtml lives only on the full schema below — it
+// reaches /api/fetch-posts' response but is dead weight on the curate/propose
+// wire, where each post can be 500KB of attacker-controllable input.
+const SubstackPostBaseSchema = z.object({
   title: z.string().max(500),
   subtitle: z.string().max(500).nullable(),
   slug: z.string().regex(/^[a-z0-9][a-z0-9-]*$/).max(100),
   publishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}/),
-  bodyHtml: z.string().max(500_000),
   excerpt: z.string().max(500),
   bodyText: z.string().max(100_000),
   audience: z.enum(['everyone', 'paid']),
   wordCount: z.number().int().min(0).max(100_000),
+})
+
+// Input schema for /api/curate and /api/propose-courses. Extra fields like
+// bodyHtml from the UI get stripped by Zod, so the attacker-controllable
+// surface in these routes is bounded by the fields above, not 25 MB.
+export const SubstackPostInputSchema = SubstackPostBaseSchema
+
+// Full schema — what /api/fetch-posts returns. bodyHtml stays for the UI
+// preview path and any future renderers.
+export const SubstackPostSchema = SubstackPostBaseSchema.extend({
+  bodyHtml: z.string().max(500_000),
 })
 
 export type CuratedLesson = z.infer<typeof CuratedLessonSchema>
@@ -70,8 +86,6 @@ export type LessonCount = typeof ALLOWED_LESSON_COUNTS[number]
 export function isLessonCount(value: unknown): value is LessonCount {
   return (ALLOWED_LESSON_COUNTS as ReadonlyArray<unknown>).includes(value)
 }
-
-export const MAX_BODY_CHARS = 15_000
 
 export interface CurateRequest {
   posts: SubstackPost[]

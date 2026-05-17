@@ -1,6 +1,8 @@
 import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
 import { getEnv } from '@/env'
+import { MAX_PROMPT_FIELD_LEN } from '@/lib/limits'
+import { safeSlice } from '@/lib/safe-string'
 import type { SubstackPost, CuratedSelection, GeneratedLesson, CuratedLesson } from '@/types'
 
 let _client: Anthropic | null = null
@@ -10,8 +12,6 @@ function getClient(): Anthropic {
 }
 
 const MODEL = 'claude-sonnet-4-6'
-
-const MAX_PROMPT_FIELD_LEN = 300
 
 // True for the specific Anthropic 400 we've actually observed in prod:
 // "Your credit balance is too low to access the Anthropic API." Also matches
@@ -92,21 +92,49 @@ one coherent topic — delivered one lesson at a time.
 - Avoids redundancy — each selected post contributes something distinct
 - Favors posts with enough substance to fill a 3–5 minute read`
 
-// Sanitizes user-controlled strings for plain-text prompt context: collapses whitespace
-// and caps length. For XML block context, also apply xmlEscape after this call.
-export function sanitizeForPrompt(s: string): string {
-  return s.slice(0, MAX_PROMPT_FIELD_LEN).replace(/[\n\r\t]/g, ' ')
+// Strips zero-width chars (U+200B-U+200F, U+FEFF) and bidi-override / isolate
+// chars (U+202A-U+202E, U+2066-U+2069) — both are documented prompt-injection
+// vectors (Rafter, "Prompt Injection 101"): they render text in reverse or
+// isolated direction, fooling humans reviewing prompt logs without changing
+// what the LLM tokenizer sees. Strip; do not collapse to space.
+const ZERO_WIDTH_AND_BIDI = /[​-‏‪-‮⁦-⁩﻿]/g
+
+// Whitespace-collapses and bidi-strips a string for plain-text prompt context.
+// NOT the trust boundary — caps are enforced at the route. Throws if the input
+// exceeds the documented cap so a future regression that moves the cap back
+// into this helper is loud (silent re-truncation hid the #146 bypass for weeks).
+//
+// `maxLen` defaults to MAX_PROMPT_FIELD_LEN (short fields like title/excerpt).
+// Pass the field's Zod max for longer fields (e.g., courseDescription = 500)
+// so the assertion still fires when the route forgot to safeSlice.
+//
+// Order: strip first, then collapse, so a sequence like `"x" ZW "y"` becomes
+// "x y" not "x  y". `\s` covers NBSP, U+2028/2029, all en/em spaces.
+export function collapsePromptWhitespace(s: string, maxLen: number = MAX_PROMPT_FIELD_LEN): string {
+  if (s.length > maxLen) {
+    throw new RangeError(
+      `collapsePromptWhitespace: input length ${s.length} exceeds maxLen (${maxLen}). ` +
+      `The route boundary should have capped this — calling helper with uncapped input is a trust-boundary violation.`,
+    )
+  }
+  return s
+    .replace(ZERO_WIDTH_AND_BIDI, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function formatPostsForCuration(posts: Pick<SubstackPost, 'slug' | 'title' | 'subtitle' | 'publishedAt' | 'wordCount' | 'excerpt'>[]): string {
   return posts.map((p, i) =>
     [
       `[${i + 1}] slug: ${p.slug}`,
-      `    title: ${sanitizeForPrompt(p.title)}`,
-      p.subtitle ? `    subtitle: ${sanitizeForPrompt(p.subtitle)}` : null,
-      `    published: ${sanitizeForPrompt(p.publishedAt).slice(0, 10)}`,
+      `    title: ${collapsePromptWhitespace(p.title)}`,
+      p.subtitle ? `    subtitle: ${collapsePromptWhitespace(p.subtitle)}` : null,
+      // publishedAt is regex-validated as a date prefix; slice to 10 chars
+      // before any helper sees it (avoids the over-cap assertion on a
+      // schema-unmaxed string).
+      `    published: ${p.publishedAt.slice(0, 10)}`,
       `    words: ${p.wordCount}`,
-      `    excerpt: ${sanitizeForPrompt(p.excerpt)}`,
+      `    excerpt: ${collapsePromptWhitespace(p.excerpt)}`,
     ].filter(Boolean).join('\n')
   ).join('\n\n')
 }
@@ -438,17 +466,21 @@ export function parseLessonMarkdown(
   lessonNum: number,
   slug: string,
 ): GeneratedLesson {
+  // Cap LLM-extracted fields at trust boundaries. `title` and `keyTakeaway`
+  // become priorLessons context in subsequent rewrite prompts — an unbounded
+  // value here amplifies cost across the loop (second-order injection).
+  // All caps use safeSlice for UTF-16 safety.
   const titleMatch = markdown.match(/^## Lesson \d+:\s*(.+)$/m)
-  const title = titleMatch?.[1]?.trim() ?? `Lesson ${lessonNum}`
+  const title = safeSlice(titleMatch?.[1]?.trim() ?? `Lesson ${lessonNum}`, MAX_PROMPT_FIELD_LEN)
 
   const subjectMatch = markdown.match(/\*\*Subject line:\*\*\s*(.+)$/m)
-  const subjectLine = subjectMatch?.[1]?.trim().slice(0, 50) ?? title.slice(0, 50)
+  const subjectLine = safeSlice(subjectMatch?.[1]?.trim() ?? title, 50)
 
   const previewMatch = markdown.match(/\*\*Preview text:\*\*\s*(.+)$/m)
-  const previewText = previewMatch?.[1]?.trim().slice(0, 90) ?? ''
+  const previewText = safeSlice(previewMatch?.[1]?.trim() ?? '', 90)
 
   const takeawayMatch = markdown.match(/\*\*Key takeaway:\*\*\s*(.+)$/m)
-  const keyTakeaway = takeawayMatch?.[1]?.trim() ?? ''
+  const keyTakeaway = safeSlice(takeawayMatch?.[1]?.trim() ?? '', MAX_PROMPT_FIELD_LEN)
 
   // strip after slice so truncation at a hyphen boundary doesn't produce a trailing-hyphen filename
   const safeSlug = (slug.replace(/[^a-z0-9-]/g, '-').slice(0, 40).replace(/^-+|-+$/g, '')) || 'lesson'

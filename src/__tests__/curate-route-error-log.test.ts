@@ -12,7 +12,7 @@ vi.mock('@/lib/ai', async () => {
     curatePostSelection: (...args: unknown[]) => curatePostSelection(...args),
     rewriteAsLesson: (...args: unknown[]) => rewriteAsLesson(...args),
     parseLessonMarkdown: vi.fn(),
-    sanitizeForPrompt: (s: string) => s,
+    collapsePromptWhitespace: (s: string) => s,
     isAnthropicQuotaError: actual.isAnthropicQuotaError,
   }
 })

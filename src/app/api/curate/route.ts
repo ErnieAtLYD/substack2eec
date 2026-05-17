@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown, sanitizeForPrompt, isAnthropicQuotaError } from '@/lib/ai'
+import { curatePostSelection, rewriteAsLesson, parseLessonMarkdown, collapsePromptWhitespace, isAnthropicQuotaError } from '@/lib/ai'
 import { logError } from '@/lib/log-error'
-import { MAX_POST_WORDS, truncateTextToWords } from '@/lib/html-text'
-import type { GeneratedLesson, CurateSSEEvent, LessonCount, CuratedSelection } from '@/types'
-import { MAX_BODY_CHARS, CuratedSelectionSchema, SubstackPostSchema, isLessonCount } from '@/types'
+import { truncateTextToWords } from '@/lib/html-text'
+import { MAX_BODY_CHARS, MAX_POST_WORDS, MAX_PROMPT_FIELD_LEN } from '@/lib/limits'
+import { safeSlice } from '@/lib/safe-string'
+import type { GeneratedLesson, CurateSSEEvent, LessonCount, CuratedSelection, SubstackPost } from '@/types'
+import { CuratedSelectionSchema, SubstackPostInputSchema, isLessonCount } from '@/types'
 
 export const maxDuration = 180
 
 const CurateRequestSchema = z.object({
-  posts: z.array(SubstackPostSchema).min(1).max(50),
+  posts: z.array(SubstackPostInputSchema).min(1).max(50),
   lessonCount: z.number(),
   selectedCourse: CuratedSelectionSchema.optional(),
 })
@@ -25,16 +27,21 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
   const body = parsed.data
 
-  // Defense-in-depth: char slice bounds DoS surface before the word-aware
-  // truncation does the cap that the LLM budget actually depends on. UI callers
-  // already pre-truncate; this is the enforcement point for direct API callers.
+  // Trust boundary: cap every field that reaches the LLM with a UTF-16-safe
+  // slice. title/subtitle/excerpt use the short-field cap; bodyText uses the
+  // generous DoS bound (MAX_BODY_CHARS) before the word-aware truncation does
+  // the binding LLM-budget cap. slug is never sliced — it must round-trip into
+  // postsBySlug.get below.
   const posts = body.posts.map(p => ({
     ...p,
+    title:    safeSlice(p.title, MAX_PROMPT_FIELD_LEN),
+    subtitle: p.subtitle === null ? null : safeSlice(p.subtitle, MAX_PROMPT_FIELD_LEN),
+    excerpt:  safeSlice(p.excerpt, MAX_PROMPT_FIELD_LEN),
     bodyText: truncateTextToWords(
-      (typeof p.bodyText === 'string' ? p.bodyText : '').slice(0, MAX_BODY_CHARS),
+      safeSlice(p.bodyText, MAX_BODY_CHARS),
       MAX_POST_WORDS,
     ),
-  }))
+  } satisfies SubstackPost))
 
   // Validate selectedCourse slug cross-reference before opening the stream
   if (body.selectedCourse) {
@@ -50,6 +57,24 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
   }
 
+  // Same trust-boundary discipline for selectedCourse fields that flow into
+  // rewrite prompts via xmlEscape: safeSlice (UTF-16 safety) then
+  // collapsePromptWhitespace (whitespace + bidi-strip), each at the field's
+  // existing Zod max — NOT a blanket cap, so no field is silently shortened.
+  // slug never sliced — must round-trip into postsBySlug.get.
+  const selectedCourse: CuratedSelection | undefined = body.selectedCourse ? {
+    ...body.selectedCourse,
+    courseTitle:       collapsePromptWhitespace(safeSlice(body.selectedCourse.courseTitle,       60),  60),
+    courseDescription: collapsePromptWhitespace(safeSlice(body.selectedCourse.courseDescription, 500), 500),
+    targetAudience:    collapsePromptWhitespace(safeSlice(body.selectedCourse.targetAudience,    200), 200),
+    overallRationale:  collapsePromptWhitespace(safeSlice(body.selectedCourse.overallRationale,  500), 500),
+    lessons: body.selectedCourse.lessons.map(l => ({
+      ...l,
+      lessonFocus:        collapsePromptWhitespace(safeSlice(l.lessonFocus,        300), 300),
+      selectionRationale: collapsePromptWhitespace(safeSlice(l.selectionRationale, 300), 300),
+    })),
+  } satisfies CuratedSelection : undefined
+
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -60,26 +85,10 @@ export async function POST(request: NextRequest): Promise<Response> {
       try {
         const lessonCount = isLessonCount(body.lessonCount) ? body.lessonCount : 5 as LessonCount
 
-        // Step 1: Curation — skip if caller provided a pre-selected course
-        let selection: CuratedSelection
-        if (body.selectedCourse) {
-          // selectedCourse already validated above — just sanitize
-          const sc = body.selectedCourse
-          selection = {
-            ...sc,
-            courseTitle:       sanitizeForPrompt(sc.courseTitle),
-            courseDescription: sanitizeForPrompt(sc.courseDescription),
-            targetAudience:    sanitizeForPrompt(sc.targetAudience),
-            overallRationale:  sanitizeForPrompt(sc.overallRationale),
-            lessons: sc.lessons.map(l => ({
-              ...l,
-              lessonFocus:        sanitizeForPrompt(l.lessonFocus),
-              selectionRationale: sanitizeForPrompt(l.selectionRationale),
-            })),
-          }
-        } else {
-          selection = await curatePostSelection(posts, lessonCount)
-        }
+        // Step 1: Curation — skip if caller provided a pre-selected course.
+        // selectedCourse already normalized above (UTF-16-safe + whitespace/bidi-stripped).
+        const selection: CuratedSelection = selectedCourse
+          ?? await curatePostSelection(posts, lessonCount)
         enqueue({ type: 'selection', data: selection })
 
         // Step 2: Rewrite each selected lesson in sequence
