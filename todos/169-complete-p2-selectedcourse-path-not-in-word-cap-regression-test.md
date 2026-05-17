@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "169"
 tags: [code-review, security, test-coverage, trust-boundary]
@@ -69,6 +69,7 @@ _Pending triage._ Option A. The whole point of the regression-test discipline is
 ## Work Log
 
 _2026-05-10:_ Filed during multi-agent review of PR #17.
+_2026-05-17:_ Resolved in commit `86c9bb7` (PR #23). `src/__tests__/curate-route-word-cap.test.ts:152` opens a `describe('selectedCourse branch', …)` block with the test at line 184 labeled `caps bodyText to MAX_POST_WORDS on the selectedCourse path (regression for #169)`. Two follow-on tests in the same block cover field-specific Zod caps and `parseLessonMarkdown` extracted fields.
 
 ## Resources
 

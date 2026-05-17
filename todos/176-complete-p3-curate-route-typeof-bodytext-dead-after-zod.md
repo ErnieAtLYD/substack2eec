@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p3
 issue_id: "176"
 tags: [code-review, dead-code, type-safety]
@@ -61,6 +61,7 @@ _Pending triage._ Option A.
 ## Work Log
 
 _2026-05-10:_ Filed during multi-agent review of PR #17.
+_2026-05-17:_ Resolved in commit `86c9bb7` (PR #23). `src/app/api/curate/route.ts:40-43` now calls `truncateTextToWords(safeSlice(p.bodyText, MAX_BODY_CHARS), MAX_POST_WORDS)` directly — the `typeof p.bodyText === 'string'` guard is gone, trusting Zod as the boundary (Option A).
 
 ## Resources
 

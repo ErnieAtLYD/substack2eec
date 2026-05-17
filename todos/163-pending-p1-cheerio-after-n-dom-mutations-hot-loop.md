@@ -10,7 +10,7 @@ dependencies: []
 
 ## Problem Statement
 
-`$('p, h1, h2, h3, h4, li').after('\n\n')` at `src/lib/html-text.ts:28` is the dominant cost of HTML extraction. For a 50-paragraph post that's 50 separate cheerio insertions; for a list-heavy "cookbook" post (200+ list items) it's 200+ DOM mutations per post, each invoking parse5-style serialization logic.
+`$('p, h1, h2, h3, h4, li').after('\n\n')` at `src/lib/html-text.ts:30` is the dominant cost of HTML extraction. For a 50-paragraph post that's 50 separate cheerio insertions; for a list-heavy "cookbook" post (200+ list items) it's 200+ DOM mutations per post, each invoking parse5-style serialization logic.
 
 `/api/fetch-posts` calls this up to 50 times per request. Rough back-of-envelope: 200 mutations × 1-3ms × 50 posts = **10-30 seconds of CPU**, all synchronous, on the request thread of a Node serverless function. This dwarfs every other cost in the PR — including the cheerio parse itself.
 
@@ -18,7 +18,7 @@ Flagged by performance-oracle (P1).
 
 ## Findings
 
-**Location:** `src/lib/html-text.ts:28`
+**Location:** `src/lib/html-text.ts:30`
 
 ```ts
 $('p, h1, h2, h3, h4, li').after('\n\n')
@@ -95,5 +95,5 @@ _2026-05-10:_ Filed during multi-agent review of PR #17.
 
 ## Resources
 
-- `src/lib/html-text.ts:28` — current implementation
+- `src/lib/html-text.ts:30` — current implementation
 - Related: #164 (event-loop yielding — separate issue, but compounds with this one)

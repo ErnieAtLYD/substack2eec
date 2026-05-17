@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "168"
 tags: [code-review, correctness, unicode]
@@ -86,6 +86,7 @@ _Pending triage._ Option A or C. Apply at every `.slice(0, N)` on user content (
 ## Work Log
 
 _2026-05-10:_ Filed during multi-agent review of PR #17.
+_2026-05-17:_ Resolved in commit `86c9bb7` (PR #23). `safeSlice` (added in `src/lib/safe-string.ts`) is now the single UTF-16-safe slice helper used in `/api/curate` for every string field (`title`, `subtitle`, `excerpt`, `bodyText`) and in `ai.ts:474-483` for `parseLessonMarkdown` extracted fields. Regression test at `src/__tests__/curate-route-word-cap.test.ts:132` (`never emits a lone high surrogate from bodyText truncation`) pins it.
 
 ## Resources
 

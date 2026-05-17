@@ -10,9 +10,9 @@ dependencies: []
 
 ## Problem Statement
 
-CLAUDE.md's `/api/curate` section lists the request shape (`posts: SubstackPost[]`), constraints (`max 50 posts`, `lessonCount in [3, 5, 7, 10]`), and the SSE event table — but does not mention that the route silently truncates `bodyText` to `MAX_POST_WORDS = 2500` words *and* slices to `MAX_BODY_CHARS = 15_000` chars.
+CLAUDE.md's `/api/curate` section lists the request shape (`posts: SubstackPost[]`), constraints (`max 50 posts`, `lessonCount in [3, 5, 7, 10]`), and the SSE event table — but does not mention that the route silently truncates `bodyText` to `MAX_POST_WORDS = 2500` words *and* slices to `MAX_BODY_CHARS = 30_000` chars.
 
-An agent author has no documented signal that they should pre-truncate to avoid silent mutation. The constants live in source (`src/lib/html-text.ts:3`, `src/types/index.ts`) but the doc references neither.
+An agent author has no documented signal that they should pre-truncate to avoid silent mutation. The constants live in source (`src/lib/limits.ts`) but the API section of the doc doesn't reference them. (CLAUDE.md's "Key rules" section *does* document them — narrow this todo to "duplicate the values in the API contract section so agent readers don't have to cross-reference.")
 
 Flagged by agent-native-reviewer (P2).
 
@@ -29,9 +29,9 @@ Under the existing `Constraints:` line in the curate section:
 ```markdown
 Constraints: max 50 posts; `lessonCount` must be one of `[3, 5, 7, 10]`; `maxDuration = 180s`.
 
-**Server-side truncation:** each post's `bodyText` is sliced to `MAX_BODY_CHARS = 15_000` chars
+**Server-side truncation:** each post's `bodyText` is sliced to `MAX_BODY_CHARS = 30_000` chars
 and then truncated to `MAX_POST_WORDS = 2500` words at the route boundary. The UI pre-truncates;
-direct API callers are silently truncated. See `src/lib/html-text.ts` for current values.
+direct API callers are silently truncated. See `src/lib/limits.ts` for current values.
 ```
 
 - Pros: One paragraph, source of truth for current behavior.

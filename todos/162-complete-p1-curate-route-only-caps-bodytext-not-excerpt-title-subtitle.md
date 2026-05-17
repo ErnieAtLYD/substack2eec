@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p1
 issue_id: "162"
 tags: [code-review, security, prompt-injection, trust-boundary, defense-in-depth]
@@ -88,6 +88,7 @@ _Pending triage._ Option A is the most consistent with #146's fix philosophy ("t
 ## Work Log
 
 _2026-05-10:_ Filed during multi-agent review of PR #17. Same shape as #146 but for sibling fields the original review missed.
+_2026-05-17:_ Resolved in commit `86c9bb7` (PR #23). `src/app/api/curate/route.ts:37-39` now applies `safeSlice(..., MAX_PROMPT_FIELD_LEN)` to `title`, `subtitle`, and `excerpt` at the trust boundary — Option A as recommended. Regression test in `src/__tests__/curate-route-word-cap.test.ts:105` (`caps title/subtitle/excerpt at MAX_PROMPT_FIELD_LEN on auto-curation branch`) pins the behavior.
 
 ## Resources
 

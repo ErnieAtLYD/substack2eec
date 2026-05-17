@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "167"
 tags: [code-review, correctness, llm-input-quality]
@@ -71,6 +71,7 @@ _Pending triage._ Option A. Add a unit test asserting the relationship: `MAX_BOD
 ## Work Log
 
 _2026-05-10:_ Filed during multi-agent review of PR #17.
+_2026-05-17:_ Resolved — `src/lib/limits.ts:13` is now `MAX_BODY_CHARS = 30_000` (Option A). Comment at the constant explicitly references the "shadowing MAX_POST_WORDS" diagnosis from this todo. CLAUDE.md "Key rules" documents the new value and the binding-constraint reasoning.
 
 ## Resources
 

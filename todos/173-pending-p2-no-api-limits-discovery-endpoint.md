@@ -10,13 +10,13 @@ dependencies: []
 
 ## Problem Statement
 
-Multiple constants gate the agent API: `MAX_POST_WORDS = 2500`, `MAX_BODY_CHARS = 15_000`, max 50 posts per request, allowed lesson counts `[3, 5, 7, 10]`. None are exposed via the API. An agent author who hard-codes `2500` to pre-truncate is at risk of drift the day a constant changes.
+Multiple constants gate the agent API: `MAX_POST_WORDS = 2500`, `MAX_BODY_CHARS = 30_000`, `MAX_PROMPT_FIELD_LEN = 300`, max 50 posts per request, allowed lesson counts `[3, 5, 7, 10]`. None are exposed via the API. An agent author who hard-codes `2500` to pre-truncate is at risk of drift the day a constant changes.
 
 Flagged by agent-native-reviewer (P2).
 
 ## Findings
 
-**Location:** values live in `src/lib/html-text.ts:3` (`MAX_POST_WORDS`), `src/types/index.ts` (`MAX_BODY_CHARS`, `ALLOWED_LESSON_COUNTS`), and `src/app/api/fetch-posts/route.ts` (max 50). Each is "exported" but only reachable by reading source.
+**Location:** trust-boundary constants now live in `src/lib/limits.ts` (`MAX_POST_WORDS`, `MAX_BODY_CHARS`, `MAX_PROMPT_FIELD_LEN`); `ALLOWED_LESSON_COUNTS` in `src/types/index.ts`; `max 50` posts in `src/app/api/fetch-posts/route.ts`. Each is exported but only reachable by reading source.
 
 ## Proposed Solutions
 
@@ -25,8 +25,7 @@ Flagged by agent-native-reviewer (P2).
 ```ts
 // src/app/api/limits/route.ts
 import { NextResponse } from 'next/server'
-import { MAX_POST_WORDS } from '@/lib/html-text'
-import { MAX_BODY_CHARS } from '@/types'
+import { MAX_POST_WORDS, MAX_BODY_CHARS, MAX_PROMPT_FIELD_LEN } from '@/lib/limits'
 
 export const runtime = 'nodejs'
 
@@ -82,6 +81,6 @@ _2026-05-10:_ Filed during multi-agent review of PR #17.
 
 ## Resources
 
-- `src/lib/html-text.ts:3`
-- `src/types/index.ts` (`MAX_BODY_CHARS`)
+- `src/lib/limits.ts` — trust-boundary constants
+- `src/types/index.ts` (`ALLOWED_LESSON_COUNTS`)
 - Related: #171, #172
