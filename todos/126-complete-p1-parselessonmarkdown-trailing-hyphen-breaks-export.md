@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p1
 issue_id: "126"
 tags: [code-review, correctness, pipeline-contract, zod]
@@ -79,3 +79,5 @@ _Leave blank for triage_
 ## Work Log
 
 - 2026-04-16: Identified by TypeScript reviewer, Security sentinel, Agent-native reviewer during code review of `fix/export-todos-117-125`
+- 2026-04-16: Resolved in commit `2c33945` — applied Option A in `src/lib/ai.ts:486` with `.replace(/^-+|-+$/g, '')` (the `+` quantifier handles consecutive trailing hyphens) and `|| 'lesson'` fallback for degenerate all-hyphen slugs. Same commit tightened `GeneratedLessonSchema.filename` regex. Test coverage in `src/__tests__/ai-filename.test.ts:17,32`.
+- 2026-05-21: Retriage — renamed file from `pending` to `complete` to match resolution.
