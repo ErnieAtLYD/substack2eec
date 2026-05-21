@@ -80,6 +80,8 @@ _Leave blank for triage_
 ## Work Log
 
 - 2026-04-16: Identified by TypeScript reviewer and agent-native reviewer during code review of PR `fix/export-edge-cases-060-061-062`
+- 2026-04-16: Resolved in commit `30b9389` — applied Option A (`.transform(v => v || 'Email Course')`) in `src/app/api/export/route.ts:8` and updated `ExportRequest.courseTitle` to optional in `src/types/index.ts:102`. Tests added in `src/__tests__/export-route.test.ts:47,53` cover empty-string and omitted cases.
+- 2026-05-21: Retriage — frontmatter was already `status: complete`; renamed file from `pending` to `complete` to match.
 
 ## Resources
 
