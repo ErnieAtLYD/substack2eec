@@ -48,4 +48,47 @@ describe('parseLessonMarkdown — filename safeSlug normalization', () => {
     expect(lesson.filename).toBe('lesson-03-why-this-matters.md')
     expect(() => GeneratedLessonSchema.parse(lesson)).not.toThrow()
   })
+
+  // todo 127 — interior runs of non-alphanumerics must not survive as consecutive hyphens
+  it('collapses interior consecutive hyphens introduced by non-alphanumeric chars', () => {
+    const lesson = parseLessonMarkdown(minimalMarkdown(4), 4, 'foo!!bar')
+    expect(lesson.filename).toBe('lesson-04-foo-bar.md')
+    expect(() => GeneratedLessonSchema.parse(lesson)).not.toThrow()
+  })
+})
+
+// todo 117 + 127 — schema-level filename validation
+describe('GeneratedLessonSchema.filename — regex constraints', () => {
+  function lesson(filename: string) {
+    return {
+      lessonNumber: 1,
+      title: 'T',
+      subjectLine: 'S',
+      previewText: 'P',
+      markdownBody: 'B',
+      keyTakeaway: 'K',
+      filename,
+    }
+  }
+
+  it.each([
+    ['lesson-01-getting-started.md'],
+    ['a-b.md'],
+    ['ab.md'],
+    ['lesson-04-foo-bar.md'],
+  ])('accepts %s', (name) => {
+    expect(() => GeneratedLessonSchema.parse(lesson(name))).not.toThrow()
+  })
+
+  it.each([
+    ['a--b.md', 'consecutive interior hyphens'],
+    ['lesson--01-test.md', 'consecutive interior hyphens after a word'],
+    ['x-y--z-w.md', 'consecutive hyphens in the middle of a longer stem'],
+    ['ab-.md', 'trailing hyphen'],
+    ['lesson-.md', 'trailing hyphen on a longer stem'],
+    ['-ab.md', 'leading hyphen'],
+    ['a.md', 'single-char stem'],
+  ])('rejects %s (%s)', (name) => {
+    expect(() => GeneratedLessonSchema.parse(lesson(name))).toThrow()
+  })
 })

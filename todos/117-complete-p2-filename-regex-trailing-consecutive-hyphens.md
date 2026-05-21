@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "117"
 tags: [code-review, zod, validation, correctness]
@@ -69,6 +69,8 @@ _Leave blank for triage_
 ## Work Log
 
 - 2026-04-16: Identified by TypeScript reviewer during code review of PR `fix/export-edge-cases-060-061-062`
+- 2026-04-16 (partial): Trailing-hyphen half resolved when `GeneratedLessonSchema.filename` was tightened to `/^[a-z0-9][a-z0-9-]*[a-z0-9]\.md$/`. Consecutive-hyphen AC remained unsatisfied and was carved into [[127]].
+- 2026-05-21: Consecutive-hyphen AC fully resolved together with [[127]]. Schema regex now `/^[a-z0-9]([a-z0-9]|-(?!-))*[a-z0-9]\.md$/` at `src/types/index.ts:69` (negative-lookahead rejects `--`). Producer at `src/lib/ai.ts:486` also collapses runs via `.replace(/-{2,}/g, '-')` so `parseLessonMarkdown` continues to satisfy the schema for AI-emitted slugs containing non-alphanumeric runs. All 3 ACs now satisfied; tests in `src/__tests__/ai-filename.test.ts` cover `a--b.md`, `lesson--01-test.md`, and the normal-slug acceptance case.
 
 ## Resources
 
