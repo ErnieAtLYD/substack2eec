@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "100"
 tags: [code-review, security, middleware, rate-limiting, vercel]
@@ -65,3 +65,5 @@ Option A. The split costs nothing and makes the behavior resilient. The doc shou
 ## Work Log
 
 - 2026-04-12: Found by security-sentinel review of PR #7
+- Resolved in commit `9870539` (PR #7 review-issues fix): `src/middleware.ts:52` now applies `.split(',')[0]?.trim()` to `x-vercel-forwarded-for` with an inline comment ("split defensively in case Vercel ever emits a comma-separated list in forwarding scenarios"); `docs/solutions/security-issues/vercel-rate-limiter-xff-ip-spoofing.md:79` was rewritten to qualify the single-IP claim ("In practice Vercel sets a single IP value here, but the split costs nothing and keeps the code resilient if that assumption ever changes"). Both ACs satisfied.
+- 2026-05-21: Retriage — renamed file from `pending` to `complete`.
