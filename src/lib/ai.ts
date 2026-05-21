@@ -482,8 +482,11 @@ export function parseLessonMarkdown(
   const takeawayMatch = markdown.match(/\*\*Key takeaway:\*\*\s*(.+)$/m)
   const keyTakeaway = safeSlice(takeawayMatch?.[1]?.trim() ?? '', MAX_PROMPT_FIELD_LEN)
 
+  // collapse runs before slicing so the 40-char window doesn't get padded with hyphens;
   // strip after slice so truncation at a hyphen boundary doesn't produce a trailing-hyphen filename
-  const safeSlug = (slug.replace(/[^a-z0-9-]/g, '-').slice(0, 40).replace(/^-+|-+$/g, '')) || 'lesson'
+  const safeSlug =
+    (slug.replace(/[^a-z0-9-]/g, '-').replace(/-{2,}/g, '-').slice(0, 40).replace(/^-+|-+$/g, '')) ||
+    'lesson'
   const filename = `lesson-${String(lessonNum).padStart(2, '0')}-${safeSlug}.md`
 
   return {

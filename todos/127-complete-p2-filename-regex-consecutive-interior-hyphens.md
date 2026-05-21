@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "127"
 tags: [code-review, zod, validation, correctness]
@@ -80,3 +80,4 @@ _Leave blank for triage_
 ## Work Log
 
 - 2026-04-16: Identified by TypeScript reviewer during code review of `fix/export-todos-117-125`. Note: todo 117 acceptance criteria listed `a--b.md` rejection as required but the implementation does not satisfy it.
+- 2026-05-21: Resolved together with [[117]]. Applied Option A (negative-lookahead regex) at `src/types/index.ts:69`: `/^[a-z0-9]([a-z0-9]|-(?!-))*[a-z0-9]\.md$/`. Also collapsed consecutive hyphens in `parseLessonMarkdown` at `src/lib/ai.ts:486` (`.replace(/-{2,}/g, '-')` before the slice) so the producer continues to satisfy the schema for slugs containing runs of non-alphanumeric chars (e.g. `foo!!bar` → `foo-bar`, not `foo--bar`). Tests in `src/__tests__/ai-filename.test.ts` cover all 4 ACs (a--b.md and lesson--01-test.md rejected; lesson-01-getting-started.md and a-b.md accepted).

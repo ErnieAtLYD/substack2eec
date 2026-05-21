@@ -65,8 +65,9 @@ export const GeneratedLessonSchema = z.object({
   previewText: z.string().max(90),
   markdownBody: z.string().max(50_000),
   keyTakeaway: z.string().max(500),
-  // stem must start and end with alphanumeric — prevents trailing hyphens
-  filename: z.string().regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]\.md$/).max(80),
+  // stem must start and end with alphanumeric and contain no consecutive hyphens.
+  // `-(?!-)` matches a single hyphen not followed by another hyphen.
+  filename: z.string().regex(/^[a-z0-9]([a-z0-9]|-(?!-))*[a-z0-9]\.md$/).max(80),
 })
 export type GeneratedLesson = z.infer<typeof GeneratedLessonSchema>
 
