@@ -22,14 +22,46 @@ export interface ExtractTextOptions {
   truncationMarker?: string
 }
 
+// Block elements after which a paragraph break is emitted, mirroring the prior
+// `$('p, h1, h2, h3, h4, li').after('\n\n')` selector exactly.
+const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'li'])
+
+// Minimal structural view of the domhandler nodes cheerio produces. We only read
+// these fields, so typing them locally avoids depending on domhandler's export
+// surface (a transitive dep) and keeps the walk resilient across cheerio versions.
+interface DomNode {
+  type: string
+  name?: string
+  data?: string
+  children?: DomNode[]
+}
+
+// Single depth-first walk that concatenates all text (matching `.text()`) and
+// appends '\n\n' after each block element (matching the old per-element mutation),
+// with zero DOM mutation and no HTML reparse. The break is emitted post-order so
+// it lands after the element's full subtree text — identical to inserting a
+// following sibling. See todo #163.
+function collectText(node: DomNode, out: string[]): void {
+  if (node.type === 'text') {
+    if (node.data) out.push(node.data)
+    return
+  }
+  if (node.children) {
+    for (const child of node.children) collectText(child, out)
+  }
+  if (node.name && BLOCK_TAGS.has(node.name)) out.push('\n\n')
+}
+
 export function extractTextFromHtml(html: string, options: ExtractTextOptions = {}): string {
   const $ = load(html)
 
   $(NOISE_SELECTORS).remove()
 
-  $('p, h1, h2, h3, h4, li').after('\n\n')
+  const body = $('body')[0] as unknown as DomNode | undefined
+  const parts: string[] = []
+  if (body) collectText(body, parts)
 
-  const text = $('body').text()
+  const text = parts.join('')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]{2,}/g, ' ')
     .trim()
