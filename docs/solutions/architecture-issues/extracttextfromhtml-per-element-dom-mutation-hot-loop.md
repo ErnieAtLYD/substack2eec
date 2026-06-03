@@ -5,7 +5,7 @@ related_issues:
   - "todos/163-complete-p1-cheerio-after-n-dom-mutations-hot-loop.md"
   - "todos/164-pending-p2-fetch-posts-blocks-event-loop-no-yielding.md"
 related_prs:
-  - "PR: fix/163-html-text-zero-mutation-walk (pending)"
+  - "PR #29 (fix/163-html-text-zero-mutation-walk)"
 fix_commits:
   - "7968bd6 perf(html-text): replace per-element DOM mutation with single-walk extraction (#163)"
 tags:
