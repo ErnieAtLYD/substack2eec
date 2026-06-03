@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { MAX_SSE_BUFFER_CHARS } from '@/lib/limits'
 import type { SubstackPost, GeneratedLesson, CurateSSEEvent, CuratedSelection } from '@/types'
 
 type Step = 'input' | 'fetching' | 'picking' | 'generating' | 'review' | 'downloading'
@@ -92,6 +93,12 @@ export async function* parseSSEStream(
     buffer += decoder.decode(value, { stream: true })
     const parts = buffer.split('\n\n')
     buffer = parts.pop() ?? ''
+    // Bound the unterminated remainder: a response that never emits \n\n would
+    // otherwise grow `buffer` until the tab OOMs (#149). Completed frames have
+    // already been popped, so this only fires on a malformed/oversized frame.
+    if (buffer.length > MAX_SSE_BUFFER_CHARS) {
+      throw new Error('SSE buffer exceeded cap without a frame terminator — upstream response malformed')
+    }
     for (const part of parts) {
       if (!part.startsWith('data: ')) continue
       try {
@@ -288,20 +295,30 @@ export default function ReviewForm() {
         return
       }
 
-      for await (const event of parseSSEStream(res.body.getReader())) {
-        const outcome = applyCurateEvent(event, inProgressLessons)
-        if (outcome.status === 'done') return
-        if (outcome.status === 'error') {
-          setError(outcome.message)
-          // If we have partial lessons, let user review what arrived
-          if (inProgressLessons.length > 0) {
-            updateLessons(inProgressLessons)
-            setStep('review')
-          } else {
-            setStep('picking')
+      // Acquire the reader once so we can cancel it on every exit path (done,
+      // error-return, thrown overflow). Without this the network connection
+      // stays open until GC (#153).
+      const reader = res.body.getReader()
+      try {
+        for await (const event of parseSSEStream(reader)) {
+          const outcome = applyCurateEvent(event, inProgressLessons)
+          if (outcome.status === 'done') return
+          if (outcome.status === 'error') {
+            setError(outcome.message)
+            // If we have partial lessons, let user review what arrived
+            if (inProgressLessons.length > 0) {
+              updateLessons(inProgressLessons)
+              setStep('review')
+            } else {
+              setStep('picking')
+            }
+            return
           }
-          return
         }
+      } finally {
+        // No-op if the stream already completed; swallows the benign
+        // "already released" rejection.
+        reader.cancel().catch(() => {})
       }
     } catch {
       recoverFromStreamException()
