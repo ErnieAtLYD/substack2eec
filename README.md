@@ -1,5 +1,7 @@
 # substack2eec
 
+<img width="3082" height="1832" alt="image" src="https://github.com/user-attachments/assets/a9a109cc-b27b-40df-b587-e83f1484ede3" />
+
 Convert a Substack newsletter archive into a ready-to-send Educational Email Course (EEC).
 
 Paste a Substack URL → the app fetches public posts, uses Claude to pick the best 3–5 lessons, rewrites each one as a tight email, and exports a ZIP of Markdown files.
