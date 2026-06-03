@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "164"
 tags: [code-review, performance, concurrency, event-loop]
@@ -63,12 +63,48 @@ _Pending triage._ Option A is the cheapest defense regardless of #163's outcome.
 
 ## Acceptance Criteria
 
-- [ ] No synchronous CPU stretch >50ms inside the request handler
-- [ ] Concurrent fetch-posts requests on the same instance interleave (verifiable with logging)
+- [x] No synchronous CPU stretch >50ms inside the request handler — extraction is the only CPU work and is <1ms typical / ~7.5ms at a 4000-item pathological post after #163
+- [x] Concurrent fetch-posts requests on the same instance interleave — the unconditional `await sleep(1_000)` before every post already yields the event loop
+
+## Resolution
+
+**Closed without a code change — already satisfied after #163.** The Problem
+Statement's premise ("the cumulative work per request remains hundreds of ms of
+pure CPU" that "stalls every concurrent request") does not match the actual
+loop. The fetch loop lives in `src/lib/substack.ts:132-136` (not the route
+handler), and it is structured so the CPU work never runs as one continuous
+burst:
+
+```ts
+for (const slug of targets) {
+  await sleep(1_000)                          // unconditional ~1s yield, every iteration
+  const post = await fetchFullPost(pub, slug) // await fetch() yields; then extractTextFromHtml runs
+  posts.push(post)
+}
+```
+
+Each `extractTextFromHtml` call is isolated between two awaits (`sleep(1000)` and
+`fetch()`), both of which fully yield the event loop. The loop is therefore never
+CPU-bound for more than a single extraction at a time. Post-#163 that extraction
+is sub-millisecond for typical posts and ~7.5ms even at a stress-test 4000-`<li>`
+post (measured in `src/lib/__tests__/html-text.bench.ts`) — well under the 50ms
+criterion. You would need ~30,000 list items in one post to approach a 50ms hold.
+
+This is exactly the outcome **Option C** predicted: "If #163 brings per-post
+extraction under ~10ms... this becomes moot." It did. Option A's
+`await new Promise(r => setImmediate(r))` would be a redundant no-op — a "yield to
+the event loop" placed immediately after a line that already yields for 1000ms —
+so it was deliberately not added (cargo-cult code a reviewer would rightly
+question).
+
+Same overstated-severity pattern as #163: the original P1 framing did not survive
+reading the actual code path.
 
 ## Work Log
 
 _2026-05-10:_ Filed during multi-agent review of PR #17.
+_2026-06-03:_ Verified already-satisfied after #163 landed; closed without code.
+See Resolution above.
 
 ## Resources
 
