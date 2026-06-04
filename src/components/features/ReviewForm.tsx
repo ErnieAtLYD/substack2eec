@@ -109,16 +109,16 @@ export async function* parseSSEStream(
       }
       for (const part of parts) {
         if (!part.startsWith('data: ')) continue
-        // Bound total frames yielded: the byte cap above bounds frame *size*,
-        // not frame *count* — endless valid frames would otherwise grow client
-        // state and pin the parse loop without ever tripping it (#186).
+        // Bound total frames processed: the byte cap above bounds frame *size*,
+        // not frame *count* — endless frames would otherwise grow client state
+        // and pin the parse loop without ever tripping it (#186). Counted
+        // before parsing so malformed frames can't bypass the cap (#187).
         if (frameCount >= maxFrames) {
           throw new Error('SSE frame count exceeded cap — upstream emitting unbounded events')
         }
+        frameCount++
         try {
-          const event = JSON.parse(part.slice(6)) as CurateSSEEvent
-          frameCount++
-          yield event
+          yield JSON.parse(part.slice(6)) as CurateSSEEvent
         } catch {
           // Malformed frame — skip, matching prior behavior.
         }

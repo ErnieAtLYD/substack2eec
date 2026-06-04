@@ -129,6 +129,18 @@ describe('parseSSEStream', () => {
     })()).rejects.toThrow(/frame count/)
   })
 
+  it('counts malformed frames toward the cap — a malformed flood cannot bypass it (#187)', async () => {
+    // Terminated-but-malformed frames drain the buffer (never trip the byte
+    // cap) and skip the parse; counting them before parsing means they still
+    // trip the frame cap instead of pinning the loop forever.
+    const badFrame = 'data: {not-valid-json\n\n'
+    const chunks = Array.from({ length: 6 }, () => enc.encode(badFrame))
+    const stream = parseSSEStream(makeReader(chunks), { maxFrames: 5 })
+    await expect((async () => {
+      for await (const event of stream) void event
+    })()).rejects.toThrow(/frame count/)
+  })
+
   it('yields all frames when the count is exactly at the cap (#186 boundary)', async () => {
     const oneFrame = `data: ${JSON.stringify({ type: 'lesson_start', lessonNumber: 1 })}\n\n`
     const chunks = Array.from({ length: 5 }, () => enc.encode(oneFrame))

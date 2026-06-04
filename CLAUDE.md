@@ -125,6 +125,8 @@ for await (const line of response.body) {
 
 Note: a malformed upstream response may never emit a `\n\n` frame terminator; clients that buffer for reassembly should bound the unterminated remainder (the web UI caps it at `MAX_SSE_BUFFER_CHARS` — a client-implementation defense, not an API guarantee).
 
+Note: disconnecting the HTTP connection cancels generation server-side — the in-flight Anthropic request is aborted and token spend stops. This works for **any** client (the server observes `request.signal`), not just the web UI. An aborted stream closes with **no further events** (no `done`, no `error`); only a connection that runs to completion is guaranteed to end with `done`. Use this to stop a course you no longer need — do not treat a missing `done` after your own disconnect as a failure.
+
 Constraints: max 50 posts; `lessonCount` must be one of `[3, 5, 7, 10]`; `maxDuration = 180s`.
 
 Note: when `selectedCourse` is provided, `lessonCount` is ignored — the lesson plan is determined entirely by `selectedCourse.lessons`.
