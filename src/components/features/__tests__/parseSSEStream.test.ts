@@ -102,4 +102,22 @@ describe('parseSSEStream', () => {
     const events = await collect(makeReader(chunks))
     expect(events).toHaveLength(frameCount)
   })
+
+  it('cancels the underlying stream when the consumer exits early (#153)', async () => {
+    let cancelled = false
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'lesson_start', lessonNumber: 1 })}\n\n`))
+        // Intentionally never closed — only cancel() releases it.
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
+    for await (const event of parseSSEStream(stream.getReader())) {
+      void event
+      break // early exit → iterator .return() → generator finally → reader.cancel()
+    }
+    expect(cancelled).toBe(true)
+  })
 })

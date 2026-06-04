@@ -87,26 +87,36 @@ export async function* parseSSEStream(
 ): AsyncGenerator<CurateSSEEvent> {
   const decoder = new TextDecoder()
   let buffer = ''
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) return
-    buffer += decoder.decode(value, { stream: true })
-    const parts = buffer.split('\n\n')
-    buffer = parts.pop() ?? ''
-    // Bound the unterminated remainder: a response that never emits \n\n would
-    // otherwise grow `buffer` until the tab OOMs (#149). Completed frames have
-    // already been popped, so this only fires on a malformed/oversized frame.
-    if (buffer.length > MAX_SSE_BUFFER_CHARS) {
-      throw new Error('SSE buffer exceeded cap without a frame terminator — upstream response malformed')
-    }
-    for (const part of parts) {
-      if (!part.startsWith('data: ')) continue
-      try {
-        yield JSON.parse(part.slice(6)) as CurateSSEEvent
-      } catch {
-        // Malformed frame — skip, matching prior behavior.
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) return
+      buffer += decoder.decode(value, { stream: true })
+      // Note: re-splitting the whole buffer per chunk is O(n²) on an
+      // unterminated stream — only kept safe by the cap below.
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop() ?? ''
+      // Bound the unterminated remainder: a response that never emits \n\n would
+      // otherwise grow `buffer` until the tab OOMs (#149). Completed frames have
+      // already been popped, so this only fires on a malformed/oversized frame.
+      if (buffer.length > MAX_SSE_BUFFER_CHARS) {
+        throw new Error('SSE buffer exceeded cap without a frame terminator — upstream response malformed')
+      }
+      for (const part of parts) {
+        if (!part.startsWith('data: ')) continue
+        try {
+          yield JSON.parse(part.slice(6)) as CurateSSEEvent
+        } catch {
+          // Malformed frame — skip, matching prior behavior.
+        }
       }
     }
+  } finally {
+    // Runs on every exit path — done-return, consumer break/return (via
+    // iterator .return()), and the overflow throw — so the network
+    // connection is released instead of lingering until GC (#153).
+    // cancel() on an already-closed stream is a benign no-op/rejection.
+    await reader.cancel().catch(() => {})
   }
 }
 
@@ -295,30 +305,20 @@ export default function ReviewForm() {
         return
       }
 
-      // Acquire the reader once so we can cancel it on every exit path (done,
-      // error-return, thrown overflow). Without this the network connection
-      // stays open until GC (#153).
-      const reader = res.body.getReader()
-      try {
-        for await (const event of parseSSEStream(reader)) {
-          const outcome = applyCurateEvent(event, inProgressLessons)
-          if (outcome.status === 'done') return
-          if (outcome.status === 'error') {
-            setError(outcome.message)
-            // If we have partial lessons, let user review what arrived
-            if (inProgressLessons.length > 0) {
-              updateLessons(inProgressLessons)
-              setStep('review')
-            } else {
-              setStep('picking')
-            }
-            return
+      for await (const event of parseSSEStream(res.body.getReader())) {
+        const outcome = applyCurateEvent(event, inProgressLessons)
+        if (outcome.status === 'done') return
+        if (outcome.status === 'error') {
+          setError(outcome.message)
+          // If we have partial lessons, let user review what arrived
+          if (inProgressLessons.length > 0) {
+            updateLessons(inProgressLessons)
+            setStep('review')
+          } else {
+            setStep('picking')
           }
+          return
         }
-      } finally {
-        // No-op if the stream already completed; swallows the benign
-        // "already released" rejection.
-        reader.cancel().catch(() => {})
       }
     } catch {
       recoverFromStreamException()
