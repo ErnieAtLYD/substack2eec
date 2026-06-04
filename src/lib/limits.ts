@@ -15,3 +15,10 @@ export const MAX_BODY_CHARS = 30_000 as const
 // LLM-budget cap on bodyText words. Binding constraint for typical English;
 // MAX_BODY_CHARS only fires for non-Latin / emoji-heavy content.
 export const MAX_POST_WORDS = 2500 as const
+
+// DoS bound on the SSE reassembly buffer in parseSSEStream: the largest
+// incomplete frame (no \n\n terminator yet) we will hold before concluding the
+// upstream /api/curate response is malformed (CDN error page, proxy, one giant
+// chunk) and bailing. A single legitimate lesson_done frame is far under this;
+// the cap is on the unterminated remainder, not cumulative throughput.
+export const MAX_SSE_BUFFER_CHARS = 1_000_000 as const

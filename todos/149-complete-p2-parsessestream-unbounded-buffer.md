@@ -61,13 +61,46 @@ _Pending triage._ Pair with #153 (reader cancellation) for a single coherent fix
 
 ## Acceptance Criteria
 
-- [ ] Buffer length is bounded; an overflow surfaces a user-facing error
-- [ ] Test in `parseSSEStream.test.ts` for the overflow case
+- [x] Buffer length is bounded; an overflow surfaces a user-facing error
+- [x] Test in `parseSSEStream.test.ts` for the overflow case
+
+## Resolution
+
+Landed together with #153 (test-first). Added `MAX_SSE_BUFFER_CHARS = 1_000_000`
+to `src/lib/limits.ts` (no `server-only`, importable from the 'use client'
+component) and a guard in `parseSSEStream`:
+
+```ts
+buffer += decoder.decode(value, { stream: true })
+const parts = buffer.split('\n\n')
+buffer = parts.pop() ?? ''
+if (buffer.length > MAX_SSE_BUFFER_CHARS) {
+  throw new Error('SSE buffer exceeded cap without a frame terminator — upstream response malformed')
+}
+```
+
+**Key design choice:** the cap is checked on the *unterminated remainder* (after
+completed frames are popped), not on cumulative throughput. A legitimate stream of
+many small frames drains `buffer` each iteration and never trips the cap; only a
+single oversized frame with no `\n\n` terminator (CDN HTML error page, proxy, one
+giant chunk) does. Two tests pin this: an overflow case (oversized chunk, no
+terminator → rejects) and a guard case (frames whose cumulative size far exceeds
+the cap but each terminates → no throw). The overflow test was written first and
+shown to fail against the uncapped code before the guard landed.
+
+The throw propagates out of the generator → the `for await` in
+`handleConfirmCandidate` → the `finally` cancels the reader (#153) → the outer
+`catch` routes to `recoverFromStreamException()`, so the user sees a recovery
+message instead of a crashed tab.
 
 ## Work Log
 
 _2026-05-02:_ Filed during code review of html-text extraction refactor.
+_2026-06-03:_ Fixed with a buffer cap + tests; landed alongside #153.
 
 ## Resources
 
 - security-sentinel review (this review)
+- `src/lib/limits.ts` — `MAX_SSE_BUFFER_CHARS`
+- `src/components/features/ReviewForm.tsx` — `parseSSEStream` guard + `finally` cancel
+- `src/components/features/__tests__/parseSSEStream.test.ts` — overflow + guard tests

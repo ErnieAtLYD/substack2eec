@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { MAX_SSE_BUFFER_CHARS } from '@/lib/limits'
 import type { SubstackPost, GeneratedLesson, CurateSSEEvent, CuratedSelection } from '@/types'
 
 type Step = 'input' | 'fetching' | 'picking' | 'generating' | 'review' | 'downloading'
@@ -86,20 +87,36 @@ export async function* parseSSEStream(
 ): AsyncGenerator<CurateSSEEvent> {
   const decoder = new TextDecoder()
   let buffer = ''
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) return
-    buffer += decoder.decode(value, { stream: true })
-    const parts = buffer.split('\n\n')
-    buffer = parts.pop() ?? ''
-    for (const part of parts) {
-      if (!part.startsWith('data: ')) continue
-      try {
-        yield JSON.parse(part.slice(6)) as CurateSSEEvent
-      } catch {
-        // Malformed frame — skip, matching prior behavior.
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) return
+      buffer += decoder.decode(value, { stream: true })
+      // Note: re-splitting the whole buffer per chunk is O(n²) on an
+      // unterminated stream — only kept safe by the cap below.
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop() ?? ''
+      // Bound the unterminated remainder: a response that never emits \n\n would
+      // otherwise grow `buffer` until the tab OOMs (#149). Completed frames have
+      // already been popped, so this only fires on a malformed/oversized frame.
+      if (buffer.length > MAX_SSE_BUFFER_CHARS) {
+        throw new Error('SSE buffer exceeded cap without a frame terminator — upstream response malformed')
+      }
+      for (const part of parts) {
+        if (!part.startsWith('data: ')) continue
+        try {
+          yield JSON.parse(part.slice(6)) as CurateSSEEvent
+        } catch {
+          // Malformed frame — skip, matching prior behavior.
+        }
       }
     }
+  } finally {
+    // Runs on every exit path — done-return, consumer break/return (via
+    // iterator .return()), and the overflow throw — so the network
+    // connection is released instead of lingering until GC (#153).
+    // cancel() on an already-closed stream is a benign no-op/rejection.
+    await reader.cancel().catch(() => {})
   }
 }
 

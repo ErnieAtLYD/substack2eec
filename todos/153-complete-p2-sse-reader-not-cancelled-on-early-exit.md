@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "153"
 tags: [code-review, performance, reliability, sse]
@@ -46,9 +46,25 @@ _Pending triage._ Land alongside #149.
 
 ## Acceptance Criteria
 
-- [ ] Reader is cancelled on every exit path (success, error, exception)
-- [ ] `recoverFromStreamException` runs on a closed reader, not an orphaned one
+- [x] Reader is cancelled on every exit path (success, error, exception)
+- [x] `recoverFromStreamException` runs on a closed reader, not an orphaned one
+
+## Resolution
+
+Implemented Option A verbatim in `handleConfirmCandidate`
+(`src/components/features/ReviewForm.tsx`): acquire the reader once into a
+variable, wrap the `for await` in `try`, and `reader.cancel().catch(() => {})` in
+`finally`. This covers all three exit paths — normal `done` return, the
+error-status return, and a thrown exception (including #149's buffer-overflow
+throw). `reader.cancel()` on an already-completed stream is a harmless no-op; the
+`.catch(() => {})` swallows the benign "already released" rejection. The outer
+`catch → recoverFromStreamException()` now always runs after the reader is
+cancelled, not on an orphaned one.
+
+Landed together with #149 (the overflow guard that makes this cancellation
+load-bearing on the error path).
 
 ## Work Log
 
 _2026-05-02:_ Filed during code review of html-text extraction refactor.
+_2026-06-03:_ Fixed via reader-into-variable + `finally` cancel; landed alongside #149.

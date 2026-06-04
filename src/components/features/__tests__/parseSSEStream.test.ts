@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseSSEStream } from '../ReviewForm'
+import { MAX_SSE_BUFFER_CHARS } from '@/lib/limits'
 import type { CurateSSEEvent } from '@/types'
 
 /**
@@ -82,5 +83,41 @@ describe('parseSSEStream', () => {
     // Cast: lesson_done shape isn't our concern here — we want the decoded title.
     const first = events[0] as Extract<CurateSSEEvent, { type: 'lesson_done' }>
     expect(first.lesson.title).toBe('naïve')
+  })
+
+  it('throws when an unterminated frame exceeds the buffer cap (#149)', async () => {
+    // A response that never emits a \n\n terminator must not grow the buffer
+    // without bound (tab OOM). One oversized chunk past the cap, no terminator.
+    const reader = makeReader([enc.encode('data: ' + 'x'.repeat(MAX_SSE_BUFFER_CHARS + 1))])
+    await expect(collect(reader)).rejects.toThrow(/SSE buffer/)
+  })
+
+  it('does not throw on many valid frames whose cumulative size exceeds the cap (#149)', async () => {
+    // The cap is on the unterminated remainder, not total throughput: each frame
+    // here completes with \n\n, so the buffer is drained every iteration even
+    // though the running total far exceeds MAX_SSE_BUFFER_CHARS.
+    const oneFrame = `data: ${JSON.stringify({ type: 'lesson_start', lessonNumber: 1 })}\n\n`
+    const frameCount = Math.ceil((MAX_SSE_BUFFER_CHARS * 2) / oneFrame.length)
+    const chunks = Array.from({ length: frameCount }, () => enc.encode(oneFrame))
+    const events = await collect(makeReader(chunks))
+    expect(events).toHaveLength(frameCount)
+  })
+
+  it('cancels the underlying stream when the consumer exits early (#153)', async () => {
+    let cancelled = false
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(enc.encode(`data: ${JSON.stringify({ type: 'lesson_start', lessonNumber: 1 })}\n\n`))
+        // Intentionally never closed — only cancel() releases it.
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
+    for await (const event of parseSSEStream(stream.getReader())) {
+      void event
+      break // early exit → iterator .return() → generator finally → reader.cancel()
+    }
+    expect(cancelled).toBe(true)
   })
 })
