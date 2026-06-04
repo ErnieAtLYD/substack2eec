@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p3
 issue_id: "185"
 tags: [code-review, quality, observability]
@@ -43,7 +43,7 @@ The #149 overflow throw carries a specific message ("SSE buffer exceeded cap wit
 
 ## Recommended Action
 
-**To be filled during triage.**
+Option 1 implemented (capture + console.error; user-facing copy unchanged).
 
 ## Technical Details
 
@@ -69,3 +69,10 @@ The #149 overflow throw carries a specific message ("SSE buffer exceeded cap wit
 
 **Learnings:**
 - A bare `catch {}` next to a deliberately-thrown diagnostic error cancels out the value of the diagnostic.
+
+### 2026-06-04 - Resolution
+
+**By:** Claude Code
+
+**Actions:**
+- `ReviewForm.tsx` outer catch: `catch (e) { console.error('curate stream failed:', e); recoverFromStreamException() }` — the #149/#186 cap throws are now diagnosable in devtools; recovery UX unchanged. No `no-console` lint rule fired. The #184 abort lives in `finally` after the try settles, so it can never feed an AbortError into this catch.

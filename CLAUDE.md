@@ -31,7 +31,7 @@ src/
 ## Key rules
 
 - IMPORTANT: When I report a bug, don't start by trying to fix it. Instead, start by writing a test that reproduces the bug. Then, have subagents try to fix the bug and prove it with a passing test.
-- All `src/lib/` files must import `server-only` — they contain secrets
+- All `src/lib/` files must import `server-only` — they contain secrets. **Exception: `src/lib/limits.ts`** — client-safe numeric constants, imported by the UI (`ReviewForm.tsx`); adding `server-only` there would break the client build
 - No `NEXT_PUBLIC_` prefix on env vars — API keys must never reach the client
 - Route Handlers use Node runtime (not Edge) — needed for `setTimeout` rate limiting
 - `export const maxDuration = 180` on `/api/curate`; `export const maxDuration = 60` on `/api/propose-courses`
@@ -122,6 +122,10 @@ for await (const line of response.body) {
   if (event.type === 'error') throw new Error(event.message)
 }
 ```
+
+Note: a malformed upstream response may never emit a `\n\n` frame terminator; clients that buffer for reassembly should bound the unterminated remainder (the web UI caps it at `MAX_SSE_BUFFER_CHARS` — a client-implementation defense, not an API guarantee).
+
+Note: disconnecting the HTTP connection cancels generation server-side — the in-flight Anthropic request is aborted and token spend stops. This works for **any** client (the server observes `request.signal`), not just the web UI. An aborted stream closes with **no further events** (no `done`, no `error`); only a connection that runs to completion is guaranteed to end with `done`. Use this to stop a course you no longer need — do not treat a missing `done` after your own disconnect as a failure.
 
 Constraints: max 50 posts; `lessonCount` must be one of `[3, 5, 7, 10]`; `maxDuration = 180s`.
 

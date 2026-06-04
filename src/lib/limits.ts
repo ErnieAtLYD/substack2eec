@@ -22,3 +22,11 @@ export const MAX_POST_WORDS = 2500 as const
 // chunk) and bailing. A single legitimate lesson_done frame is far under this;
 // the cap is on the unterminated remainder, not cumulative throughput.
 export const MAX_SSE_BUFFER_CHARS = 1_000_000 as const
+
+// DoS bound on total `data:` frames processed by parseSSEStream (valid or
+// malformed — counted before parsing, so malformed frames can't bypass it):
+// bounds CPU and accumulated client state when a malfunctioning same-origin
+// server emits endless frames — the growth dimension MAX_SSE_BUFFER_CHARS
+// doesn't cover (#186, #187). Legitimate ceiling ≈ 20k (10 lessons × ~2k
+// text_delta-sized lesson_chunk events at max_tokens 2048), so ~5× margin.
+export const MAX_SSE_FRAMES = 100_000 as const

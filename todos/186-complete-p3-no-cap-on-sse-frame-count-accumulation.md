@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p3
 issue_id: "186"
 tags: [code-review, security, pre-existing]
@@ -55,7 +55,7 @@ The #149 cap bounds a single unterminated frame, but a malicious or broken same-
 
 ## Recommended Action
 
-**To be filled during triage.**
+Option 1 implemented (user-confirmed): `MAX_SSE_FRAMES` guard in parseSSEStream.
 
 ## Technical Details
 
@@ -83,3 +83,12 @@ The #149 cap bounds a single unterminated frame, but a malicious or broken same-
 
 **Learnings:**
 - Bounding one dimension (frame size) highlights the unbounded neighbor (frame count); enumerate all growth dimensions when adding caps.
+
+### 2026-06-04 - Resolution
+
+**By:** Claude Code
+
+**Actions:**
+- `src/lib/limits.ts`: `MAX_SSE_FRAMES = 100_000 as const` with rationale (legitimate ceiling ≈ 20k lesson_chunk events for 10 lessons; ~5× margin)
+- `parseSSEStream`: optional `{ maxFrames = MAX_SSE_FRAMES }` param; counts yielded frames, throws past the cap into the existing #149 throw → generator-finally-cancel → recover path; malformed (skipped) frames don't count
+- Tests: trip case (6 frames, `maxFrames: 5` override → rejects /frame count/) and at-cap boundary (5 frames → all yielded) — small override keeps fixtures tiny per the #183 lesson; runtime-shape validation of parsed frames noted as accepted same-origin risk (unchanged)

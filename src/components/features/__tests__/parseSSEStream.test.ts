@@ -92,15 +92,63 @@ describe('parseSSEStream', () => {
     await expect(collect(reader)).rejects.toThrow(/SSE buffer/)
   })
 
-  it('does not throw on many valid frames whose cumulative size exceeds the cap (#149)', async () => {
+  it('does not throw on valid frames whose cumulative size exceeds the cap (#149)', async () => {
     // The cap is on the unterminated remainder, not total throughput: each frame
     // here completes with \n\n, so the buffer is drained every iteration even
-    // though the running total far exceeds MAX_SSE_BUFFER_CHARS.
-    const oneFrame = `data: ${JSON.stringify({ type: 'lesson_start', lessonNumber: 1 })}\n\n`
-    const frameCount = Math.ceil((MAX_SSE_BUFFER_CHARS * 2) / oneFrame.length)
+    // though the running total far exceeds MAX_SSE_BUFFER_CHARS. Few large frames
+    // (not many tiny ones) so test cost doesn't scale with the cap constant (#183).
+    const oneFrame = `data: ${JSON.stringify({ type: 'lesson_chunk', lessonNumber: 1, text: 'x'.repeat(400_000) })}\n\n`
+    const frameCount = 5
+    // Pin the relationship the fixture relies on, so a cap increase can't
+    // silently turn this into a does-not-exceed test.
+    expect(frameCount * oneFrame.length).toBeGreaterThan(MAX_SSE_BUFFER_CHARS)
     const chunks = Array.from({ length: frameCount }, () => enc.encode(oneFrame))
     const events = await collect(makeReader(chunks))
     expect(events).toHaveLength(frameCount)
+  })
+
+  it('does not throw on an unterminated remainder of exactly the cap (#149 boundary)', async () => {
+    // Pins the comparison direction: `>` not `>=`. First chunk is exactly
+    // MAX_SSE_BUFFER_CHARS chars with no terminator (must be held, not rejected);
+    // the second chunk completes the frame, which must parse and yield.
+    const frame = 'data: "' + 'x'.repeat(MAX_SSE_BUFFER_CHARS - 8) + '"'
+    expect(frame.length).toBe(MAX_SSE_BUFFER_CHARS)
+    const events = await collect(makeReader([enc.encode(frame), enc.encode('\n\n')]))
+    expect(events).toHaveLength(1)
+  })
+
+  it('throws when the frame count exceeds the cap (#186)', async () => {
+    // Endless *valid* frames never trip the byte cap (each drains the buffer),
+    // so frame count is bounded separately. Small maxFrames override keeps the
+    // fixture tiny; production default is MAX_SSE_FRAMES.
+    const oneFrame = `data: ${JSON.stringify({ type: 'lesson_start', lessonNumber: 1 })}\n\n`
+    const chunks = Array.from({ length: 6 }, () => enc.encode(oneFrame))
+    const stream = parseSSEStream(makeReader(chunks), { maxFrames: 5 })
+    await expect((async () => {
+      for await (const event of stream) void event
+    })()).rejects.toThrow(/frame count/)
+  })
+
+  it('counts malformed frames toward the cap — a malformed flood cannot bypass it (#187)', async () => {
+    // Terminated-but-malformed frames drain the buffer (never trip the byte
+    // cap) and skip the parse; counting them before parsing means they still
+    // trip the frame cap instead of pinning the loop forever.
+    const badFrame = 'data: {not-valid-json\n\n'
+    const chunks = Array.from({ length: 6 }, () => enc.encode(badFrame))
+    const stream = parseSSEStream(makeReader(chunks), { maxFrames: 5 })
+    await expect((async () => {
+      for await (const event of stream) void event
+    })()).rejects.toThrow(/frame count/)
+  })
+
+  it('yields all frames when the count is exactly at the cap (#186 boundary)', async () => {
+    const oneFrame = `data: ${JSON.stringify({ type: 'lesson_start', lessonNumber: 1 })}\n\n`
+    const chunks = Array.from({ length: 5 }, () => enc.encode(oneFrame))
+    const events: CurateSSEEvent[] = []
+    for await (const event of parseSSEStream(makeReader(chunks), { maxFrames: 5 })) {
+      events.push(event)
+    }
+    expect(events).toHaveLength(5)
   })
 
   it('cancels the underlying stream when the consumer exits early (#153)', async () => {

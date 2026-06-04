@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p3
 issue_id: "183"
 tags: [code-review, quality, testing]
@@ -46,7 +46,7 @@ The two new #149 tests are correct, but the throughput test's cost scales linear
 
 ## Recommended Action
 
-**To be filled during triage.**
+Option 1 implemented (few-large-frames rewrite + boundary test).
 
 ## Technical Details
 
@@ -74,3 +74,11 @@ The two new #149 tests are correct, but the throughput test's cost scales linear
 
 **Learnings:**
 - Test fixtures derived as multiples of a tunable constant silently inherit that constant's future growth.
+
+### 2026-06-04 - Resolution
+
+**By:** Claude Code
+
+**Actions:**
+- Throughput test rewritten: 5 large terminated frames (`text: 'x'.repeat(400_000)`, explicit literal) instead of ~41k tiny ones; the cumulative>cap relationship is asserted separately so a cap increase can't silently neuter the test. SSE test file now runs in ~8ms.
+- Boundary test added: unterminated chunk of exactly `MAX_SSE_BUFFER_CHARS` chars (held, not rejected) then a `\n\n` completion (parses and yields) — pins `>` vs `>=`.

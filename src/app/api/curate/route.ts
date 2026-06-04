@@ -79,8 +79,28 @@ export async function POST(request: NextRequest): Promise<Response> {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const enqueue = (event: CurateSSEEvent) =>
-        controller.enqueue(encoder.encode(sseEvent(event)))
+      // Client-disconnect handling (#184): gate on signal.aborted rather than
+      // error type — abort manifests both as the SDK's APIUserAbortError and as
+      // enqueue throwing once the client is gone; one guard covers both.
+      const signal = request.signal
+      let closed = false
+      const enqueue = (event: CurateSSEEvent) => {
+        if (closed || signal.aborted) return
+        try {
+          controller.enqueue(encoder.encode(sseEvent(event)))
+        } catch {
+          closed = true // client vanished mid-flush
+        }
+      }
+      const safeClose = () => {
+        if (closed) return
+        closed = true
+        try {
+          controller.close()
+        } catch {
+          // already closed/errored
+        }
+      }
 
       try {
         const lessonCount = isLessonCount(body.lessonCount) ? body.lessonCount : 5 as LessonCount
@@ -88,7 +108,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         // Step 1: Curation — skip if caller provided a pre-selected course.
         // selectedCourse already normalized above (UTF-16-safe + whitespace/bidi-stripped).
         const selection: CuratedSelection = selectedCourse
-          ?? await curatePostSelection(posts, lessonCount)
+          ?? await curatePostSelection(posts, lessonCount, signal)
         enqueue({ type: 'selection', data: selection })
 
         // Step 2: Rewrite each selected lesson in sequence
@@ -97,6 +117,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         const total = selection.lessons.length
 
         for (const curatedLesson of selection.lessons) {
+          if (signal.aborted) break
           const post = postsBySlug.get(curatedLesson.slug)
           if (!post) continue
 
@@ -104,10 +125,12 @@ export async function POST(request: NextRequest): Promise<Response> {
           enqueue({ type: 'lesson_start', lessonNumber: lessonNum })
 
           let fullMarkdown = ''
-          for await (const chunk of rewriteAsLesson(post, lessonNum, total, selection, completedLessons)) {
+          for await (const chunk of rewriteAsLesson(post, lessonNum, total, selection, completedLessons, signal)) {
+            if (signal.aborted) break
             fullMarkdown += chunk
             enqueue({ type: 'lesson_chunk', lessonNumber: lessonNum, text: chunk })
           }
+          if (signal.aborted) break // don't parse/emit a partial lesson_done
 
           const lesson = parseLessonMarkdown(fullMarkdown, lessonNum, curatedLesson.slug)
           completedLessons.push(lesson)
@@ -116,17 +139,22 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         enqueue({ type: 'done', lessons: completedLessons })
       } catch (err) {
-        logError('[curate] stream error:', err)
-        // SSE response status was already sent (200) when the stream opened, so
-        // we can't return 503 here — communicate via the error event message.
-        const message = isAnthropicQuotaError(err)
-          ? 'AI service temporarily unavailable. Please try again later.'
-          : err instanceof Error && err.message.startsWith('No suitable posts')
-            ? err.message
-            : 'An error occurred generating your course. Please try again.'
-        enqueue({ type: 'error', message })
+        if (signal.aborted) {
+          // Client disconnected — expected teardown, not a failure: no log,
+          // no error event (there is no one left to read it anyway).
+        } else {
+          logError('[curate] stream error:', err)
+          // SSE response status was already sent (200) when the stream opened, so
+          // we can't return 503 here — communicate via the error event message.
+          const message = isAnthropicQuotaError(err)
+            ? 'AI service temporarily unavailable. Please try again later.'
+            : err instanceof Error && err.message.startsWith('No suitable posts')
+              ? err.message
+              : 'An error occurred generating your course. Please try again.'
+          enqueue({ type: 'error', message })
+        }
       } finally {
-        controller.close()
+        safeClose()
       }
     },
   })

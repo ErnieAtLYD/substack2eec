@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p3
 issue_id: "182"
 tags: [code-review, quality, documentation]
@@ -48,7 +48,7 @@ Project CLAUDE.md says "All `src/lib/` files must import `server-only`." `limits
 
 ## Recommended Action
 
-**To be filled during triage.**
+Option 1 implemented (all three doc surfaces + the agent-facing SSE note).
 
 ## Technical Details
 
@@ -76,3 +76,13 @@ Project CLAUDE.md says "All `src/lib/` files must import `server-only`." `limits
 
 **Learnings:**
 - A documented exception to a blanket rule becomes a footgun the moment something depends on the exception; document at the dependency site.
+
+### 2026-06-04 - Resolution
+
+**By:** Claude Code
+
+**Actions:**
+- `ReviewForm.tsx`: comment above the `@/lib/limits` import noting limits.ts is intentionally client-safe
+- `CLAUDE.md` Key rules: `server-only` rule now carries an explicit `limits.ts` exception with the why
+- `CLAUDE.md` Agent API: one-sentence note after the Parse SSE snippet — bound the unterminated remainder; client-implementation defense, not an API guarantee
+- `compound-engineering.local.md`: same exception note in Review Context
