@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p3
 issue_id: "184"
 tags: [code-review, performance, cost]
@@ -43,7 +43,7 @@ dependencies: []
 
 ## Recommended Action
 
-**To be filled during triage.**
+Option 1 implemented end-to-end (user-confirmed scope): client AbortController + route observes `request.signal` + signal plumbed into both Anthropic SDK calls.
 
 ## Technical Details
 
@@ -71,3 +71,17 @@ dependencies: []
 
 **Learnings:**
 - `reader.cancel()` and `fetch` abort are different layers: one frees the client connection, the other stops upstream work.
+
+### 2026-06-04 - Resolution
+
+**By:** Claude Code
+
+**Actions:**
+- `ai.ts`: `rewriteAsLesson` and `curatePostSelection` take trailing optional `signal?: AbortSignal`, forwarded as the SDK's 2nd-arg `RequestOptions` (`messages.stream(body, { signal })` / `messages.create(body, { signal })`); abort throws the SDK's `APIUserAbortError`
+- `route.ts`: safe-`enqueue` (no-ops once `closed || signal.aborted`, latches `closed` if enqueue throws) + `safeClose`; `if (signal.aborted) break` before each lesson, inside the chunk loop, and before `parseLessonMarkdown`; catch gates on `signal.aborted` (NOT error type — covers both the SDK abort error and post-disconnect enqueue throws) so disconnects are never logged or emitted as `error` events
+- `ReviewForm.tsx`: per-request `AbortController`, `signal` on the fetch, `controller.abort()` in a function-level `finally` — runs after the try settles, so it can't inject an AbortError into the catch; no-op after normal completion
+- Tests (`src/__tests__/curate-route-abort.test.ts`): mid-stream abort (lesson 2 never starts, no error event, no log, stream closes) + abort during the curation step (zero events, no log). `NextRequest` forwards `signal` from RequestInit natively — no wrapper needed.
+- Client-side abort unit test skipped as disproportionate (node-env, no fetch mock, handler closed over hooks); correctness is structural (`finally`) and the effect is pinned server-side
+
+**Learnings:**
+- Gate server teardown on `request.signal.aborted`, not on error type — abort manifests simultaneously as an SDK error and as enqueue-throws; one guard covers both races.

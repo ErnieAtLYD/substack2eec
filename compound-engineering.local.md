@@ -12,7 +12,7 @@ Next.js 15 TypeScript app. Single-page UI (`ReviewForm.tsx`) with SSE streaming 
 
 ## Review Context
 
-- All `src/lib/` files must import `server-only` — secrets must never reach the client
+- All `src/lib/` files must import `server-only` — secrets must never reach the client. Exception: `src/lib/limits.ts` (client-safe numeric constants, imported by the UI — do not "fix" it by adding `server-only`)
 - No `NEXT_PUBLIC_` env vars — API keys are server-only
 - Route Handlers use Node runtime (not Edge)
 - `MAX_POST_WORDS = 2500` truncation in `src/lib/substack.ts`

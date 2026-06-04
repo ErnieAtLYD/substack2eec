@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { MAX_SSE_BUFFER_CHARS } from '@/lib/limits'
+// limits.ts is intentionally client-safe (no 'server-only') — see its header.
+import { MAX_SSE_BUFFER_CHARS, MAX_SSE_FRAMES } from '@/lib/limits'
 import type { SubstackPost, GeneratedLesson, CurateSSEEvent, CuratedSelection } from '@/types'
 
 type Step = 'input' | 'fetching' | 'picking' | 'generating' | 'review' | 'downloading'
@@ -84,9 +85,13 @@ const EXAMPLES = [
  */
 export async function* parseSSEStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
+  // maxFrames is overridable so tests can pin the cap without 100k-frame
+  // fixtures (the #183 lesson: keep fixture cost decoupled from tunable caps).
+  { maxFrames = MAX_SSE_FRAMES }: { maxFrames?: number } = {},
 ): AsyncGenerator<CurateSSEEvent> {
   const decoder = new TextDecoder()
   let buffer = ''
+  let frameCount = 0
   try {
     while (true) {
       const { done, value } = await reader.read()
@@ -104,8 +109,16 @@ export async function* parseSSEStream(
       }
       for (const part of parts) {
         if (!part.startsWith('data: ')) continue
+        // Bound total frames yielded: the byte cap above bounds frame *size*,
+        // not frame *count* — endless valid frames would otherwise grow client
+        // state and pin the parse loop without ever tripping it (#186).
+        if (frameCount >= maxFrames) {
+          throw new Error('SSE frame count exceeded cap — upstream emitting unbounded events')
+        }
         try {
-          yield JSON.parse(part.slice(6)) as CurateSSEEvent
+          const event = JSON.parse(part.slice(6)) as CurateSSEEvent
+          frameCount++
+          yield event
         } catch {
           // Malformed frame — skip, matching prior behavior.
         }
@@ -291,11 +304,16 @@ export default function ReviewForm() {
 
     const inProgressLessons: GeneratedLesson[] = []
 
+    // Abort the fetch on every exit path so the server's request.signal fires
+    // and generation (and its token spend) stops deterministically (#184).
+    // reader.cancel() alone only frees the client side.
+    const abortController = new AbortController()
     try {
       const res = await fetch('/api/curate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ posts, lessonCount: candidate.lessons.length, selectedCourse: candidate }),
+        signal: abortController.signal,
       })
 
       if (!res.ok || !res.body) {
@@ -320,8 +338,16 @@ export default function ReviewForm() {
           return
         }
       }
-    } catch {
+    } catch (e) {
+      // Surface the specific reason (e.g. the #149 buffer-cap throw) in devtools;
+      // the user-facing message stays the generic recovery copy.
+      console.error('curate stream failed:', e)
       recoverFromStreamException()
+    } finally {
+      // Runs after the try has already returned/thrown, so this can never
+      // inject an AbortError into the catch above; after normal completion
+      // it's a no-op on the settled fetch.
+      abortController.abort()
     }
   }
 

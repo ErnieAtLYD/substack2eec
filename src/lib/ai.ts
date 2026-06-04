@@ -139,7 +139,7 @@ function formatPostsForCuration(posts: Pick<SubstackPost, 'slug' | 'title' | 'su
   ).join('\n\n')
 }
 
-export async function curatePostSelection(posts: SubstackPost[], lessonCount: number): Promise<CuratedSelection> {
+export async function curatePostSelection(posts: SubstackPost[], lessonCount: number, signal?: AbortSignal): Promise<CuratedSelection> {
   const prompt = `\
 Below are ${posts.length} posts from a Substack newsletter archive.
 
@@ -158,7 +158,7 @@ that together form the best EEC. The lessons array must be ordered by sequencePo
     tools: [buildCurationTool(lessonCount)],
     tool_choice: { type: 'tool', name: 'select_course_posts' },
     messages: [{ role: 'user', content: prompt }],
-  })
+  }, { signal })
 
   if (response.stop_reason === 'max_tokens') {
     throw new Error('Curation response was truncated (max_tokens). Try with fewer posts.')
@@ -406,6 +406,9 @@ export async function* rewriteAsLesson(
   total: number,
   selection: CuratedSelection,
   priorLessons: GeneratedLesson[],
+  // Caller-supplied abort (e.g. the curate route's request.signal) stops the
+  // Anthropic stream — and its token spend — when the client disconnects.
+  signal?: AbortSignal,
 ): AsyncGenerator<string> {
   const curatedLesson = selection.lessons.find(l => l.slug === post.slug)
   const focus = curatedLesson?.lessonFocus ?? `Key insights from "${post.title}"`
@@ -445,7 +448,7 @@ Write Lesson ${lessonNum} of ${total} now. Start directly with "## Lesson ${less
         ],
       },
     ],
-  })
+  }, { signal })
 
   for await (const event of stream) {
     if (
