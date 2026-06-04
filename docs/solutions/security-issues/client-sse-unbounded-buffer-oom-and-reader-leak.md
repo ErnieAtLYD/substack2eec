@@ -177,7 +177,7 @@ The first #153 fix (review todo 181) hoisted the reader up to the call site and 
 A stream read-loop has more than one thing that can grow without bound. PR #32 capped frame *size* but the same loop still has unbounded frame *count* (open todo 186). Before shipping any read-loop, enumerate each axis and either bound it or consciously waive it with a one-line comment:
 
 - [ ] **Unterminated remainder** (`buffer` between delimiters) — capped via a named constant? ✅ `MAX_SSE_BUFFER_CHARS`
-- [ ] **Frame / event count** — bounded or consciously waived? ⚠️ currently unbounded (todo 186)
+- [ ] **Frame / event count** — bounded or consciously waived? ✅ `MAX_SSE_FRAMES` since PR #33 (counted before parsing — see [sse-client-disconnect-abort-and-frame-cap-bypass.md](sse-client-disconnect-abort-and-frame-cap-bypass.md))
 - [ ] **Cumulative accumulated state** (events pushed, lessons collected) — bounded or waived?
 - [ ] **Per-chunk parse cost** — the O(n²) whole-buffer re-split is only safe *because* of the size cap; note that coupling so the cap can't be removed (or raised hugely) in isolation
 - [ ] **Resource handles** (reader/decoder) — released on every exit path? (see #2)
